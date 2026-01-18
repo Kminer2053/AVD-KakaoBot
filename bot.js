@@ -43,15 +43,16 @@ var botConfig = null;
 var serverConfig = null;
 var pollingTimer = null;
 
-// 명령어 목록
+// 명령어 목록 (/ prefix로 일반 대화와 구분)
 var COMMANDS = {
-  '리스크': 'risk',
-  '제휴': 'partnership',
-  '기술': 'tech',
-  '일정': 'schedule',
-  '뉴스': 'news',
-  '도움말': 'help',
-  '헬프': 'help'
+  '/리스크': 'risk',
+  '/제휴': 'partnership',
+  '/기술': 'tech',
+  '/일정': 'schedule',
+  '/뉴스': 'news',
+  '/도움말': 'help',
+  '/헬프': 'help',
+  '/help': 'help'
 };
 
 // ========================================
@@ -201,15 +202,15 @@ function makeRequest(method, path, body) {
     
     // HTTP 상태 코드 확인 (정상 응답인 경우)
     try {
-      var statusCode = -1;
+      var responseStatusCode = -1;
       if (response.statusCode) {
-        statusCode = response.statusCode();
+        responseStatusCode = response.statusCode();
       } else if (response.statusCode) {
-        statusCode = response.statusCode;
+        responseStatusCode = response.statusCode;
       }
       
-      if (statusCode !== -1 && statusCode !== 200) {
-        Log.e('HTTP 에러 상태 코드: ' + statusCode);
+      if (responseStatusCode !== -1 && responseStatusCode !== 200) {
+        Log.e('HTTP 에러 상태 코드: ' + responseStatusCode);
         var errorBody = '';
         try {
           if (response.body) {
@@ -391,8 +392,18 @@ function handleAdminCommand(room, msg, sender, replier, config) {
         showStatus(config, replier);
         break;
         
+      case '!방이름':
+        // 현재 방의 정확한 이름을 로그와 응답으로 출력
+        Log.i('========================================');
+        Log.i('[방 이름 확인 요청]');
+        Log.i('방 이름(room): [' + room + ']');
+        Log.i('요청자(sender): [' + sender + ']');
+        Log.i('========================================');
+        replier.reply('=== 방 정보 ===\n방 이름: [' + room + ']\n요청자: [' + sender + ']\n\n※ 이 방 이름을 사용하여 !방추가 명령어를 실행하세요.');
+        break;
+        
       default:
-        replier.reply('알 수 없는 명령어: ' + cmd + '\n\n사용 가능한 명령어:\n!방추가, !방삭제, !방, !일정알림, !명령, !방목록, !상태');
+        replier.reply('알 수 없는 명령어: ' + cmd + '\n\n사용 가능한 명령어:\n!방추가, !방삭제, !방, !일정알림, !명령, !방목록, !상태, !방이름');
     }
   } catch (e) {
     replier.reply('오류 발생: ' + e);
