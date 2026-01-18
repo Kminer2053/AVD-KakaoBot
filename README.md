@@ -36,14 +36,28 @@ AVD-KakaoBot/
 
 ## 설정
 
-### 1. bot.js 수정 (선택사항)
+### 1. bot.js 수정 (필수)
 
-**중요**: `SERVER_URL`과 `BOT_TOKEN`은 서버에서 자동으로 받아오므로 설정 불필요합니다.
+**⚠️ 중요: 봇 실행 전에 반드시 아래 두 값을 입력해야 합니다!**
 
-필요한 경우 `bot.js` 파일 상단의 `CONFIG` 객체만 수정하세요:
+`bot.js` 파일 상단의 `CONFIG` 객체에서 다음 두 값을 설정하세요:
 
 ```javascript
 var CONFIG = {
+  // ========================================
+  // ⚠️ 중요: 아래 두 값을 실행 전에 반드시 입력하세요!
+  // ========================================
+  
+  // 초기 연결용 서버 URL (백엔드 서버 주소)
+  // 예: 'https://myteamdashboard.onrender.com'
+  INITIAL_SERVER_URL: '',  // ← 여기에 서버 주소 입력
+  
+  // 초기 연결용 봇 토큰 (백엔드 .env의 BOT_API_TOKEN과 동일한 값)
+  // 백엔드 서버 관리자에게 문의하여 토큰 값을 받아서 입력하세요
+  INITIAL_BOT_TOKEN: '',  // ← 여기에 토큰 입력
+  
+  // ========================================
+  
   // 디바이스 ID (다중 봇 운영 시 고유하게)
   DEVICE_ID: 'avd-bot-1',  // 원하는 ID로 변경
   
@@ -59,6 +73,12 @@ var CONFIG = {
   // HTTP 요청 타임아웃
   REQUEST_TIMEOUT_MS: 10000
 };
+```
+
+**설정 예시:**
+```javascript
+INITIAL_SERVER_URL: 'https://myteamdashboard.onrender.com',
+INITIAL_BOT_TOKEN: 'a1b2c3d4e5f6g7h8...',  // 실제 토큰 값 입력
 ```
 
 ### 2. 백엔드 설정 확인
@@ -119,10 +139,16 @@ BOT_API_TOKEN=your-secret-token-here
 
 ## 문제 해결
 
+### 초기 설정 오류
+```
+초기 설정 오류: INITIAL_SERVER_URL 또는 INITIAL_BOT_TOKEN이 설정되지 않았습니다.
+```
+**해결 방법**: `bot.js` 파일의 `CONFIG` 객체에서 `INITIAL_SERVER_URL`과 `INITIAL_BOT_TOKEN` 값을 입력하세요.
+
 ### 연결 안 됨
-1. `config.js`의 `SERVER_URL` 확인
+1. `CONFIG`의 `INITIAL_SERVER_URL` 확인
 2. 백엔드 서버 실행 여부 확인
-3. `BOT_TOKEN` 일치 여부 확인
+3. `INITIAL_BOT_TOKEN` 일치 여부 확인 (백엔드 `.env`의 `BOT_API_TOKEN`과 동일해야 함)
 4. 방화벽 설정 확인
 
 ### 메시지 안 전송
@@ -160,11 +186,16 @@ BOT_API_TOKEN=your-secret-token-here
 
 ## 보안
 
-- ✅ **개선**: `BOT_TOKEN`과 `SERVER_URL`은 코드에 포함되지 않고 서버에서 동적으로 받아옵니다
-- 백엔드 `.env` 파일은 `.gitignore`에 추가하세요
-- 토큰 노출 시 즉시 재발급하세요
+- ✅ **GitHub 안전**: `INITIAL_SERVER_URL`과 `INITIAL_BOT_TOKEN`은 빈 값으로 설정되어 있어 GitHub에 민감 정보가 노출되지 않습니다
+- ⚠️ **사용자 책임**: 봇 실행 전 사용자가 직접 두 값을 입력해야 합니다
+- 🔒 **토큰 관리**: 
+  - 토큰은 백엔드 관리자에게 문의하여 받으세요
+  - 토큰을 다른 사람과 공유하지 마세요
+  - 토큰 노출 시 즉시 재발급하세요
+- 📝 **Git 커밋 시 주의**: 
+  - 토큰 입력 후 `bot.js`를 커밋하지 마세요
+  - `.gitignore`에 설정 파일을 추가하거나, 커밋 전 토큰을 제거하세요
 - 관리자 닉네임은 신중하게 관리하세요
-- AVD 봇 코드는 민감 정보가 없어 GitHub에 안전하게 공개 가능합니다
 
 ## 라이센스
 

@@ -6,7 +6,19 @@
 // 1. 설정
 // ========================================
 var CONFIG = {
-  // SERVER_URL과 BOT_TOKEN은 서버 API에서 받아옴
+  // ========================================
+  // ⚠️ 중요: 아래 두 값을 실행 전에 반드시 입력하세요!
+  // ========================================
+  
+  // 초기 연결용 서버 URL (백엔드 서버 주소)
+  // 예: 'https://myteamdashboard.onrender.com'
+  INITIAL_SERVER_URL: '',  // ← 여기에 서버 주소 입력
+  
+  // 초기 연결용 봇 토큰 (백엔드 .env의 BOT_API_TOKEN과 동일한 값)
+  // 백엔드 서버 관리자에게 문의하여 토큰 값을 받아서 입력하세요
+  INITIAL_BOT_TOKEN: '',  // ← 여기에 토큰 입력
+  
+  // ========================================
   
   // 디바이스 ID (다중 봇 운영 시 구분용)
   DEVICE_ID: 'avd-bot-1',
@@ -99,9 +111,19 @@ function setServerConfig(conf) {
 
 function makeRequest(method, path, body) {
   try {
-    // serverConfig가 있으면 우선 사용, 없으면 fallback (최초 연결용)
-    var baseUrl = (serverConfig && serverConfig.serverUrl) || 'https://myteamdashboard.onrender.com';
-    var token = (serverConfig && serverConfig.botToken) || '';
+    // serverConfig가 있으면 우선 사용, 없으면 CONFIG의 초기값 사용
+    var baseUrl = (serverConfig && serverConfig.serverUrl) || CONFIG.INITIAL_SERVER_URL;
+    var token = (serverConfig && serverConfig.botToken) || CONFIG.INITIAL_BOT_TOKEN;
+    
+    // 초기값이 비어있으면 에러
+    if (!baseUrl || !token) {
+      Log.e('========================================');
+      Log.e('초기 설정 오류: INITIAL_SERVER_URL 또는 INITIAL_BOT_TOKEN이 설정되지 않았습니다.');
+      Log.e('bot.js 파일의 CONFIG 객체에서 위 두 값을 확인하고 입력하세요.');
+      Log.e('========================================');
+      logError('초기 설정 오류: INITIAL_SERVER_URL 또는 INITIAL_BOT_TOKEN이 설정되지 않았습니다.');
+      return null;
+    }
     
     var url = baseUrl + path;
     var response;
