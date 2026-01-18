@@ -111,7 +111,6 @@ function setServerConfig(conf) {
 
 function makeRequest(method, path, body) {
   try {
-    // serverConfig가 있으면 우선 사용, 없으면 CONFIG의 초기값 사용
     var baseUrl = (serverConfig && serverConfig.serverUrl) || CONFIG.INITIAL_SERVER_URL;
     var token = (serverConfig && serverConfig.botToken) || CONFIG.INITIAL_BOT_TOKEN;
     
@@ -126,30 +125,113 @@ function makeRequest(method, path, body) {
     }
     
     var url = baseUrl + path;
+    
+    // 디버깅: 요청 정보 로그
+    Log.i('API 요청 시도: ' + method + ' ' + url);
+    Log.i('토큰 길이: ' + token.length);
+    
     var response;
     
-    if (method === 'GET') {
-      response = org.jsoup.Jsoup.connect(url)
-        .header('X-BOT-TOKEN', token)
-        .ignoreContentType(true)
-        .timeout(CONFIG.REQUEST_TIMEOUT_MS)
-        .get();
-    } else {
-      response = org.jsoup.Jsoup.connect(url)
-        .header('X-BOT-TOKEN', token)
-        .header('Content-Type', 'application/json')
-        .requestBody(JSON.stringify(body))
-        .ignoreContentType(true)
-        .timeout(CONFIG.REQUEST_TIMEOUT_MS)
-        .method(org.jsoup.Connection.Method.POST)
-        .execute();
+    try {
+      if (method === 'GET') {
+        response = org.jsoup.Jsoup.connect(url)
+          .header('X-BOT-TOKEN', token)
+          .ignoreContentType(true)
+          .timeout(CONFIG.REQUEST_TIMEOUT_MS)
+          .get();
+      } else {
+        response = org.jsoup.Jsoup.connect(url)
+          .header('X-BOT-TOKEN', token)
+          .header('Content-Type', 'application/json')
+          .requestBody(JSON.stringify(body))
+          .ignoreContentType(true)
+          .timeout(CONFIG.REQUEST_TIMEOUT_MS)
+          .method(org.jsoup.Connection.Method.POST)
+          .execute();
+      }
+    } catch (httpError) {
+      // HTTP 에러 상세 처리
+      var errorMsg = String(httpError);
+      var errorClassName = '';
+      
+      // 에러 클래스 이름 확인
+      try {
+        if (httpError.getClass && httpError.getClass().getName) {
+          errorClassName = httpError.getClass().getName();
+        }
+      } catch (e) {
+        // 무시
+      }
+      
+      Log.e('========================================');
+      Log.e('HTTP 연결 실패: ' + errorMsg);
+      Log.e('에러 타입: ' + errorClassName);
+      
+      // HttpStatusException인 경우 상태 코드 확인
+      if (errorClassName && errorClassName.indexOf('HttpStatusException') !== -1) {
+        try {
+          var statusCode = -1;
+          if (httpError.getStatusCode) {
+            statusCode = httpError.getStatusCode();
+          } else if (httpError.statusCode) {
+            statusCode = httpError.statusCode;
+          }
+          
+          if (statusCode !== -1) {
+            Log.e('HTTP 상태 코드: ' + statusCode);
+            
+            if (statusCode === 401) {
+              Log.e('인증 실패: X-BOT-TOKEN이 올바르지 않습니다.');
+              Log.e('CONFIG.INITIAL_BOT_TOKEN 값을 확인하세요.');
+            } else if (statusCode === 404) {
+              Log.e('경로를 찾을 수 없습니다: ' + url);
+            } else if (statusCode === 500) {
+              Log.e('서버 내부 오류가 발생했습니다.');
+            }
+          }
+        } catch (e) {
+          Log.e('상태 코드 확인 실패: ' + e);
+        }
+      }
+      Log.e('========================================');
+      
+      logError('API 요청 실패 (' + path + '): ' + errorMsg);
+      return null;
+    }
+    
+    // HTTP 상태 코드 확인 (정상 응답인 경우)
+    try {
+      var statusCode = -1;
+      if (response.statusCode) {
+        statusCode = response.statusCode();
+      } else if (response.statusCode) {
+        statusCode = response.statusCode;
+      }
+      
+      if (statusCode !== -1 && statusCode !== 200) {
+        Log.e('HTTP 에러 상태 코드: ' + statusCode);
+        var errorBody = '';
+        try {
+          if (response.body) {
+            errorBody = response.body();
+          }
+        } catch (e) {
+          errorBody = '응답 본문 읽기 실패: ' + e;
+        }
+        Log.e('응답 본문: ' + errorBody);
+        return null;
+      }
+    } catch (e) {
+      // 상태 코드 확인 실패는 무시 (일부 환경에서는 지원되지 않을 수 있음)
     }
     
     var text = response.body();
     return JSON.parse(text);
     
   } catch (e) {
-    Log.e('API 요청 실패 (' + path + '): ' + e);
+    Log.e('API 요청 중 예외 발생: ' + e);
+    Log.e('예외 타입: ' + (typeof e));
+    logError('API 요청 실패 (' + path + '): ' + e);
     return null;
   }
 }
