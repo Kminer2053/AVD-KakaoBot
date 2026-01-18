@@ -1,0 +1,12 @@
+# 백업 폴더
+.archive/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# 로그
+*.log

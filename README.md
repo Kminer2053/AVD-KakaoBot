@@ -4,20 +4,18 @@
 
 ## 프로젝트 구조
 
+**⚠️ 중요: 메신저봇R은 `require()`를 지원하지 않으므로 모든 코드가 `bot.js` 하나로 통합되어 있습니다.**
+
 ```
 AVD-KakaoBot/
 ├── README.md              ← 이 파일
-├── bot.js                 ← 메인 엔트리 포인트 (메신저봇R)
-├── config.js              ← 설정 파일
-├── handlers/
-│   ├── commandHandler.js  ← 일반 명령 처리
-│   ├── adminHandler.js    ← 관리자 명령 처리
-│   └── outboxHandler.js   ← Outbox 폴링/전송/ACK
-└── utils/
-    ├── api.js             ← HTTP 요청 유틸리티
-    ├── messageFormatter.js ← 메시지 분할/포맷팅
-    └── logger.js          ← 로깅 유틸리티
+├── bot.js                 ← 메인 스크립트 (단일 파일, 모든 기능 통합)
+├── config.js              ← (참고용, 사용 안 함)
+├── handlers/              ← (참고용, 사용 안 함)
+└── utils/                 ← (참고용, 사용 안 함)
 ```
+
+**실제 사용 파일**: `bot.js` 하나만 메신저봇R에 업로드하면 됩니다.
 
 ## 설치
 
@@ -34,20 +32,18 @@ AVD-KakaoBot/
 ### 3. 봇 스크립트 업로드
 1. 메신저봇R 앱 실행
 2. 프로젝트 생성 또는 기존 프로젝트 선택
-3. 모든 `.js` 파일을 프로젝트에 복사
+3. **`bot.js` 파일만** 프로젝트에 복사 (다른 파일은 불필요)
 
 ## 설정
 
-### 1. config.js 수정 (선택사항)
+### 1. bot.js 수정 (선택사항)
 
 **중요**: `SERVER_URL`과 `BOT_TOKEN`은 서버에서 자동으로 받아오므로 설정 불필요합니다.
 
-필요한 경우 다음 설정만 변경하세요:
+필요한 경우 `bot.js` 파일 상단의 `CONFIG` 객체만 수정하세요:
 
 ```javascript
-module.exports = {
-  // SERVER_URL과 BOT_TOKEN은 서버 API에서 받아옴
-  
+var CONFIG = {
   // 디바이스 ID (다중 봇 운영 시 고유하게)
   DEVICE_ID: 'avd-bot-1',  // 원하는 ID로 변경
   
@@ -151,6 +147,7 @@ BOT_API_TOKEN=your-secret-token-here
 - **실행 환경**: 메신저봇R (Rhino 엔진)
 - **HTTP 클라이언트**: org.jsoup.Jsoup
 - **아키텍처**: Outbox Pattern (비동기 큐)
+- **구조**: 단일 파일 (메신저봇R의 require() 미지원 대응)
 
 ## 제약사항
 
