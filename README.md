@@ -38,21 +38,21 @@ AVD-KakaoBot/
 
 ## 설정
 
-### 1. config.js 수정
+### 1. config.js 수정 (선택사항)
+
+**중요**: `SERVER_URL`과 `BOT_TOKEN`은 서버에서 자동으로 받아오므로 설정 불필요합니다.
+
+필요한 경우 다음 설정만 변경하세요:
 
 ```javascript
 module.exports = {
-  // 서버 URL (AVD에서 호스트 PC 접근)
-  SERVER_URL: 'http://10.0.2.2:5000',
-  
-  // 봇 인증 토큰 (백엔드 .env의 BOT_API_TOKEN과 동일한 값)
-  BOT_TOKEN: 'your-secret-token-here',
+  // SERVER_URL과 BOT_TOKEN은 서버 API에서 받아옴
   
   // 디바이스 ID (다중 봇 운영 시 고유하게)
-  DEVICE_ID: 'avd-01',
+  DEVICE_ID: 'avd-bot-1',  // 원하는 ID로 변경
   
   // Outbox 폴링 간격 (밀리초)
-  POLL_INTERVAL_MS: 15000, // 15초
+  POLL_INTERVAL_MS: 15000, // 기본값: 15초
   
   // 한 번에 가져올 메시지 수
   PULL_LIMIT: 20,
@@ -61,19 +61,18 @@ module.exports = {
   MAX_MESSAGE_LENGTH: 3000,
   
   // HTTP 요청 타임아웃
-  REQUEST_TIMEOUT_MS: 10000 // 10초
+  REQUEST_TIMEOUT_MS: 10000
 };
 ```
 
-### 2. 서버 연결 확인
-- AVD에서 호스트 PC는 `10.0.2.2`로 접근
-- 백엔드가 `localhost:5000`이면 → `http://10.0.2.2:5000`
-
-### 3. 백엔드 설정
-백엔드 `.env` 파일에 동일한 토큰 설정:
+### 2. 백엔드 설정 확인
+백엔드 `.env` 파일에 다음 환경변수가 설정되어 있어야 합니다:
 ```bash
+SERVER_URL=https://myteamdashboard.onrender.com
 BOT_API_TOKEN=your-secret-token-here
 ```
+
+봇은 시작 시 `/api/bot/config` API를 호출하여 `serverUrl`과 `botToken`을 자동으로 받아옵니다.
 
 ## 사용법
 
@@ -164,10 +163,11 @@ BOT_API_TOKEN=your-secret-token-here
 
 ## 보안
 
-- `BOT_TOKEN`은 절대 노출하지 마세요
-- `.env` 파일은 `.gitignore`에 추가하세요
+- ✅ **개선**: `BOT_TOKEN`과 `SERVER_URL`은 코드에 포함되지 않고 서버에서 동적으로 받아옵니다
+- 백엔드 `.env` 파일은 `.gitignore`에 추가하세요
 - 토큰 노출 시 즉시 재발급하세요
 - 관리자 닉네임은 신중하게 관리하세요
+- AVD 봇 코드는 민감 정보가 없어 GitHub에 안전하게 공개 가능합니다
 
 ## 라이센스
 

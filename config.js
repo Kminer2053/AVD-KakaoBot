@@ -1,13 +1,9 @@
 // config.js
 module.exports = {
-  // 서버 URL (AVD에서 호스트 PC 접근)
-  SERVER_URL: 'http://10.0.2.2:5000',
-  
-  // 봇 인증 토큰 (백엔드 .env의 BOT_API_TOKEN과 동일해야 함)
-  BOT_TOKEN: 'your-secret-token-here',
+  // SERVER_URL과 BOT_TOKEN은 서버 API에서 받아옴
   
   // 디바이스 ID (다중 봇 운영 시 구분용)
-  DEVICE_ID: 'avd-01',
+  DEVICE_ID: 'avd-bot-1',
   
   // Outbox 폴링 간격 (밀리초)
   POLL_INTERVAL_MS: 15000, // 15초

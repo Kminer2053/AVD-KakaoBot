@@ -1,20 +1,31 @@
 // utils/api.js
 var config = require('../config');
 
+// 서버에서 받은 설정 저장 (serverUrl, botToken)
+var serverConfig = null;
+
+function setServerConfig(conf) {
+  serverConfig = conf;
+}
+
 function makeRequest(method, path, body) {
   try {
-    var url = config.SERVER_URL + path;
+    // serverConfig가 있으면 우선 사용, 없으면 fallback (최초 연결용)
+    var baseUrl = (serverConfig && serverConfig.serverUrl) || 'https://myteamdashboard.onrender.com';
+    var token = (serverConfig && serverConfig.botToken) || '';
+    
+    var url = baseUrl + path;
     var response;
     
     if (method === 'GET') {
       response = org.jsoup.Jsoup.connect(url)
-        .header('X-BOT-TOKEN', config.BOT_TOKEN)
+        .header('X-BOT-TOKEN', token)
         .ignoreContentType(true)
         .timeout(config.REQUEST_TIMEOUT_MS)
         .get();
     } else {
       response = org.jsoup.Jsoup.connect(url)
-        .header('X-BOT-TOKEN', config.BOT_TOKEN)
+        .header('X-BOT-TOKEN', token)
         .header('Content-Type', 'application/json')
         .requestBody(JSON.stringify(body))
         .ignoreContentType(true)
@@ -33,7 +44,15 @@ function makeRequest(method, path, body) {
 }
 
 function loadConfig() {
-  return makeRequest('GET', '/api/bot/config');
+  var result = makeRequest('GET', '/api/bot/config');
+  if (result) {
+    // 서버에서 받은 설정 저장
+    setServerConfig({
+      serverUrl: result.serverUrl,
+      botToken: result.botToken
+    });
+  }
+  return result;
 }
 
 function updateConfig(botConfig) {

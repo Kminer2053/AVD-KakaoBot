@@ -52,8 +52,8 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     if (msg.startsWith('!')) {
       // 관리자 확인
       var isAdmin = false;
-      for (var i = 0; i < botConfig.admins.length; i++) {
-        if (botConfig.admins[i] === sender) {
+      for (var j = 0; j < botConfig.admins.length; j++) {
+        if (botConfig.admins[j] === sender) {
           isAdmin = true;
           break;
         }
