@@ -2,16 +2,6 @@
 // AVD 카카오톡 봇 (메신저봇R 단일 파일 버전)
 // ========================================
 
-// 스크립트 로드 확인 로그
-try {
-  Log.i('========================================');
-  Log.i('[스크립트 로드] bot.js 파일이 로드되었습니다');
-  Log.i('[스크립트 로드] 모든 변수/함수 정의 후 onStartCompile() 호출 예정');
-  Log.i('========================================');
-} catch(e) {
-  // Log 객체가 아직 없을 수 있음
-}
-
 // ========================================
 // 1. 설정
 // ========================================
@@ -22,11 +12,11 @@ var CONFIG = {
   
   // 초기 연결용 서버 URL (백엔드 서버 주소)
   // 예: 'https://myteamdashboard.onrender.com'
-  INITIAL_SERVER_URL: '',  // ← 여기에 서버 주소 입력
+  INITIAL_SERVER_URL: 'https://myteamdashboard.onrender.com',  // ← 서버 주소 입력됨
   
   // 초기 연결용 봇 토큰 (백엔드 .env의 BOT_API_TOKEN과 동일한 값)
   // 백엔드 서버 관리자에게 문의하여 토큰 값을 받아서 입력하세요
-  INITIAL_BOT_TOKEN: '',  // ← 여기에 토큰 입력
+  INITIAL_BOT_TOKEN: '5992f83a8a73b5fe8ef90ef6d85c0725a0aa3a148ecf4e10cf053acc7225c74d',  // ← 토큰 입력됨
   
   // ========================================
   
@@ -270,7 +260,7 @@ function makeRequest(method, path, body) {
       return null;
     }
     
-    } catch (e) {
+  } catch (e) {
     Log.e('API 요청 중 예외 발생: ' + e);
     Log.e('예외 타입: ' + (typeof e));
     logError('API 요청 실패 (' + path + '): ' + e);
@@ -279,30 +269,14 @@ function makeRequest(method, path, body) {
 }
 
 function loadConfig() {
-  Log.i('[loadConfig] 시작');
-  Log.i('[loadConfig] INITIAL_SERVER_URL: ' + (CONFIG.INITIAL_SERVER_URL || '비어있음'));
-  Log.i('[loadConfig] INITIAL_BOT_TOKEN 길이: ' + (CONFIG.INITIAL_BOT_TOKEN ? CONFIG.INITIAL_BOT_TOKEN.length : 0));
-  
   var result = makeRequest('GET', '/api/bot/config');
-  
-  Log.i('[loadConfig] makeRequest 결과:');
-  Log.i('  - result 존재: ' + (result ? 'YES' : 'NO'));
   if (result) {
-    Log.i('  - result.serverUrl: ' + (result.serverUrl || '없음'));
-    Log.i('  - result.botToken 길이: ' + (result.botToken ? result.botToken.length : 0));
-    Log.i('  - result.admins: ' + (result.admins ? result.admins.length + '명' : '없음'));
-    Log.i('  - result.rooms: ' + (result.rooms ? result.rooms.length + '개' : '없음'));
-    
     // 서버에서 받은 설정 저장
     setServerConfig({
       serverUrl: result.serverUrl,
       botToken: result.botToken
     });
-    Log.i('[loadConfig] serverConfig 저장 완료');
-  } else {
-    Log.e('[loadConfig] makeRequest가 null을 반환했습니다');
   }
-  
   return result;
 }
 
@@ -335,36 +309,19 @@ function handleCommand(room, msg, sender, replier) {
   try {
     var command = msg.trim();
     
-    Log.i('[명령어 디버그] handleCommand 시작: ' + command);
-    Log.i('[명령어 디버그] 사용 가능한 명령어: ' + Object.keys(COMMANDS).join(', '));
-    
     // 명령어 확인
     if (!COMMANDS[command]) {
-      Log.e('[명령어 디버그] 명령어 없음: ' + command);
       return; // 알 수 없는 명령어는 무시
     }
     
-    Log.i('[명령어 디버그] 명령어 확인됨: ' + command + ' -> ' + COMMANDS[command]);
-    
     // 백엔드 API 호출
-    Log.i('[명령어 디버그] callBackendAPI 호출 시작');
     var response = callBackendAPI(room, msg, sender);
     
-    Log.i('[명령어 디버그] callBackendAPI 응답:');
-    Log.i('  - 응답 존재: ' + (response ? 'YES' : 'NO'));
-    if (response) {
-      Log.i('  - message 필드: ' + (response.message ? 'YES (' + response.message.length + '자)' : 'NO'));
-      Log.i('  - error 필드: ' + (response.error ? 'YES (' + response.error + ')' : 'NO'));
-    }
-    
     if (response && response.message) {
-      Log.i('[명령어 디버그] 메시지 전송: ' + response.message.substring(0, Math.min(50, response.message.length)) + '...');
       replier.reply(response.message);
     } else if (response && response.error) {
-      Log.e('[명령어 디버그] 오류 응답: ' + response.error);
       replier.reply('오류: ' + response.error);
     } else {
-      Log.e('[명령어 디버그] 응답 없음');
       replier.reply('응답을 받지 못했습니다.');
     }
     
@@ -376,16 +333,13 @@ function handleCommand(room, msg, sender, replier) {
 
 function callBackendAPI(room, msg, sender) {
   try {
-    var baseUrl = (serverConfig && serverConfig.serverUrl) || CONFIG.INITIAL_SERVER_URL || 'https://myteamdashboard.onrender.com';
+    var baseUrl = (serverConfig && serverConfig.serverUrl) || 'https://myteamdashboard.onrender.com';
     var url = baseUrl + '/kakao/message';
     var requestBody = JSON.stringify({
       room: room,
       message: msg,
       sender: sender
     });
-    
-    Log.i('[명령어 디버그] API 요청 URL: ' + url);
-    Log.i('[명령어 디버그] 요청 본문: ' + requestBody);
     
     var response = org.jsoup.Jsoup.connect(url)
       .header('Content-Type', 'application/json')
@@ -395,28 +349,11 @@ function callBackendAPI(room, msg, sender) {
       .method(org.jsoup.Connection.Method.POST)
       .execute();
     
-    var statusCode = -1;
-    try {
-      statusCode = response.statusCode ? response.statusCode() : -1;
-    } catch(e) {}
-    
-    Log.i('[명령어 디버그] HTTP 상태 코드: ' + statusCode);
-    
     var text = response.body();
-    
-    Log.i('[명령어 디버그] 응답 본문 길이: ' + (text ? text.length : 0));
-    if (text && text.length > 0) {
-      var preview = text.length > 200 ? text.substring(0, 200) + '...' : text;
-      Log.i('[명령어 디버그] 응답 본문 미리보기: ' + preview);
-    }
-    
-    var parsed = JSON.parse(text);
-    Log.i('[명령어 디버그] JSON 파싱 성공');
-    return parsed;
+    return JSON.parse(text);
     
   } catch (e) {
-    Log.e('[명령어 디버그] 백엔드 API 호출 실패: ' + e);
-    Log.e('[명령어 디버그] 에러 타입: ' + (typeof e));
+    Log.e('백엔드 API 호출 실패: ' + e);
     return { error: '서버 연결 실패' };
   }
 }
@@ -674,31 +611,84 @@ function startOutboxPolling(config) {
   }
   
   pollingTimer = setInterval(function() {
+    // #region agent log
+    try {
+      var logData = {pollInterval:CONFIG.POLL_INTERVAL_MS,timestamp:Date.now()};
+      var logBody = JSON.stringify({location:'bot.js:582',message:'폴링 타이머 실행',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'});
+      org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+    } catch(e) {}
+    // #endregion
     processOutbox(config);
   }, CONFIG.POLL_INTERVAL_MS);
   
   // 즉시 첫 실행
+  // #region agent log
+  try {
+    var logData = {pollInterval:CONFIG.POLL_INTERVAL_MS,immediate:true};
+    var logBody = JSON.stringify({location:'bot.js:590',message:'폴링 즉시 실행',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'});
+    org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+  } catch(e) {}
+  // #endregion
   processOutbox(config);
   
   Log.i('Outbox 폴링 시작 (간격: ' + (CONFIG.POLL_INTERVAL_MS / 1000) + '초)');
 }
 
 function processOutbox(config) {
+  var pollStartTime = Date.now();
+  // #region agent log
+  try {
+    var logData = {deviceId:CONFIG.DEVICE_ID,pullLimit:CONFIG.PULL_LIMIT};
+    var logBody = JSON.stringify({location:'bot.js:592',message:'processOutbox 시작',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'});
+    org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+  } catch(e) {}
+  // #endregion
   try {
     // 1. 메시지 Pull
     var response = pullMessages(CONFIG.DEVICE_ID, CONFIG.PULL_LIMIT);
     
+    // #region agent log
+    try {
+      var logData = {hasResponse:!!response,itemCount:response&&response.items?response.items.length:0};
+      var logBody = JSON.stringify({location:'bot.js:598',message:'pullMessages 응답',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'});
+      org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+    } catch(e) {}
+    // #endregion
+    
     if (!response || !response.items || response.items.length === 0) {
+      // #region agent log
+      try {
+        var logData = {duration:Date.now()-pollStartTime};
+        var logBody = JSON.stringify({location:'bot.js:601',message:'메시지 없음 종료',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'});
+        org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+      } catch(e) {}
+      // #endregion
       return;
     }
     
     Log.i('메시지 ' + response.items.length + '개 수신');
+    
+    // #region agent log
+    try {
+      var logData = {itemCount:response.items.length,items:response.items.map(function(i){return{id:i.id,targetRoom:i.targetRoom,type:i.type};})};
+      var logBody = JSON.stringify({location:'bot.js:605',message:'메시지 수신',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'});
+      org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+    } catch(e) {}
+    // #endregion
     
     var results = [];
     
     // 2. 각 메시지 처리
     for (var i = 0; i < response.items.length; i++) {
       var item = response.items[i];
+      
+      // #region agent log
+      try {
+        var logData = {itemId:item.id,targetRoom:item.targetRoom,index:i};
+        var logBody = JSON.stringify({location:'bot.js:610',message:'메시지 처리 시작',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'});
+        org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+      } catch(e) {}
+      // #endregion
       
       try {
         // 방 설정 확인
@@ -709,6 +699,14 @@ function processOutbox(config) {
             break;
           }
         }
+        
+        // #region agent log
+        try {
+          var logData = {targetRoom:item.targetRoom,roomFound:!!roomConfig,roomEnabled:roomConfig?roomConfig.enabled:false};
+          var logBody = JSON.stringify({location:'bot.js:618',message:'방 설정 확인',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'});
+          org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+        } catch(e) {}
+        // #endregion
         
         if (!roomConfig || !roomConfig.enabled) {
           results.push({
@@ -727,24 +725,27 @@ function processOutbox(config) {
         var sendError = null;
         for (var k = 0; k < messages.length; k++) {
           try {
-            Log.i('[메시지 전송 시도] 방: ' + item.targetRoom + ', 청크: ' + (k + 1) + '/' + messages.length);
             var sent = Api.replyRoom(item.targetRoom, messages[k]);
             if (!sent) {
-              Log.e('[메시지 전송 실패] Api.replyRoom이 false를 반환했습니다. 방: ' + item.targetRoom);
               success = false;
               sendError = 'Api.replyRoom returned false';
               break;
             }
-            Log.i('[메시지 전송 성공] 방: ' + item.targetRoom + ', 청크: ' + (k + 1) + '/' + messages.length);
             
             // 분할 메시지 사이 딜레이
             if (k < messages.length - 1) {
               java.lang.Thread.sleep(500);
             }
           } catch (sendEx) {
-            Log.e('[메시지 전송 예외] 방: ' + item.targetRoom + ', 에러: ' + sendEx);
             success = false;
             sendError = String(sendEx);
+            // #region agent log
+            try {
+              var logData = {targetRoom:item.targetRoom,chunkIndex:k,error:String(sendEx)};
+              var logBody = JSON.stringify({location:'bot.js:640',message:'메시지 전송 중 예외',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'});
+              org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+            } catch(e) {}
+            // #endregion
             break;
           }
         }
@@ -755,6 +756,13 @@ function processOutbox(config) {
             status: 'sent'
           });
           Log.i('전송 성공: ' + item.targetRoom);
+          // #region agent log
+          try {
+            var logData = {targetRoom:item.targetRoom,itemId:item.id};
+            var logBody = JSON.stringify({location:'bot.js:652',message:'전송 성공',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'});
+            org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+          } catch(e) {}
+          // #endregion
         } else {
           results.push({
             id: item.id,
@@ -762,6 +770,13 @@ function processOutbox(config) {
             error: sendError || 'send failed'
           });
           Log.e('전송 실패: ' + item.targetRoom);
+          // #region agent log
+          try {
+            var logData = {targetRoom:item.targetRoom,itemId:item.id,error:sendError||'send failed'};
+            var logBody = JSON.stringify({location:'bot.js:658',message:'전송 실패',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'});
+            org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+          } catch(e) {}
+          // #endregion
         }
         
       } catch (e) {
@@ -771,14 +786,43 @@ function processOutbox(config) {
           error: String(e)
         });
         Log.e('메시지 처리 오류: ' + e);
+        // #region agent log
+        try {
+          var logData = {targetRoom:item.targetRoom,itemId:item.id,error:String(e)};
+          var logBody = JSON.stringify({location:'bot.js:667',message:'메시지 처리 예외',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'});
+          org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+        } catch(e) {}
+        // #endregion
       }
     }
     
     // 3. ACK 전송
+    // #region agent log
+    try {
+      var logData = {resultCount:results.length,results:results.map(function(r){return{id:r.id,status:r.status};})};
+      var logBody = JSON.stringify({location:'bot.js:672',message:'ACK 전송 전',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'});
+      org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+    } catch(e) {}
+    // #endregion
     sendAck(CONFIG.DEVICE_ID, results);
+    
+    // #region agent log
+    try {
+      var logData = {duration:Date.now()-pollStartTime,resultCount:results.length};
+      var logBody = JSON.stringify({location:'bot.js:675',message:'processOutbox 완료',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'});
+      org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+    } catch(e) {}
+    // #endregion
     
   } catch (e) {
     Log.e('Outbox 처리 오류: ' + e);
+    // #region agent log
+    try {
+      var logData = {error:String(e),duration:Date.now()-pollStartTime};
+      var logBody = JSON.stringify({location:'bot.js:677',message:'processOutbox 예외',data:logData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'});
+      org.jsoup.Jsoup.connect('http://127.0.0.1:7242/ingest/86fcf8fb-2266-42d6-9b83-89778f1b6a43').header('Content-Type','application/json').requestBody(logBody).method(org.jsoup.Connection.Method.POST).ignoreContentType(true).timeout(1000).execute();
+    } catch(e) {}
+    // #endregion
   }
 }
 
@@ -789,22 +833,12 @@ function processOutbox(config) {
 // 봇 시작 시 초기화
 function onStartCompile() {
   try {
-    Log.i('========================================');
-    Log.i('[초기화] onStartCompile 함수 호출됨');
-    Log.i('========================================');
     logInfo('=== 카카오봇 초기화 시작 ===');
     
     // 서버에서 설정 로드
-    Log.i('[초기화] loadConfig() 호출 시작');
     botConfig = loadConfig();
-    Log.i('[초기화] loadConfig() 완료');
-    Log.i('[초기화] botConfig 존재: ' + (botConfig ? 'YES' : 'NO'));
     
     if (botConfig) {
-      Log.i('[초기화] botConfig 내용 확인:');
-      Log.i('  - admins: ' + (botConfig.admins ? botConfig.admins.length + '명' : '없음'));
-      Log.i('  - rooms: ' + (botConfig.rooms ? botConfig.rooms.length + '개' : '없음'));
-      
       logInfo('카카오봇 초기화 완료');
       logInfo('관리자: ' + botConfig.admins.join(', '));
       
@@ -817,23 +851,12 @@ function onStartCompile() {
       logInfo('활성 방: ' + enabledRooms + '/' + botConfig.rooms.length);
       
       // Outbox 폴링 시작
-      Log.i('[초기화] Outbox 폴링 시작');
       startOutboxPolling(botConfig);
       
     } else {
-      Log.e('========================================');
-      Log.e('[초기화] 설정 로드 실패 - botConfig가 null입니다');
-      Log.e('[초기화] 가능한 원인:');
-      Log.e('  1. INITIAL_SERVER_URL이 비어있음');
-      Log.e('  2. INITIAL_BOT_TOKEN이 비어있음');
-      Log.e('  3. 서버 연결 실패');
-      Log.e('  4. 인증 실패 (토큰 불일치)');
-      Log.e('========================================');
       logError('설정 로드 실패 - 서버 연결을 확인하세요');
     }
   } catch (e) {
-    Log.e('[초기화] 예외 발생: ' + e);
-    Log.e('[초기화] 예외 타입: ' + (typeof e));
     logError('초기화 오류: ' + e);
   }
 }
@@ -841,7 +864,7 @@ function onStartCompile() {
 // 메시지 수신 시
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
   try {
-    // 설정이 로드되지 않았으면 종료
+    // 설정이 로드되지 않았으면 무시
     if (!botConfig) {
       return;
     }
@@ -898,19 +921,3 @@ setInterval(function() {
     logError('설정 동기화 오류: ' + e);
   }
 }, 60 * 60 * 1000);
-
-// ========================================
-// 10. 스크립트 로드 완료 후 초기화
-// ========================================
-// 모든 변수와 함수가 정의된 후에 onStartCompile() 호출
-// (MessengerBotR이 자동 호출하지 않을 경우를 대비)
-try {
-  Log.i('========================================');
-  Log.i('[스크립트 로드 완료] 모든 변수/함수 정의 완료');
-  Log.i('[스크립트 로드 완료] onStartCompile() 수동 호출 시작');
-  Log.i('========================================');
-  onStartCompile();
-  Log.i('[스크립트 로드 완료] onStartCompile() 수동 호출 성공');
-} catch(initError) {
-  Log.e('[스크립트 로드 완료] onStartCompile() 호출 실패: ' + initError);
-}
