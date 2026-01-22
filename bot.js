@@ -335,48 +335,40 @@ function handleCommand(room, msg, sender, replier) {
   try {
     var command = msg.trim();
     
-    Log.i('[명령어 디버그] handleCommand 시작: ' + command);
-    Log.i('[명령어 디버그] 사용 가능한 명령어: ' + Object.keys(COMMANDS).join(', '));
-    
     // 명령어 확인
     if (!COMMANDS[command]) {
-      Log.e('[명령어 디버그] 명령어 없음: ' + command);
-      return; // 알 수 없는 명령어는 무시
+      // 알 수 없는 /명령어는 도움말 안내
+      replier.reply('알 수 없는 명령어입니다: ' + command + '\n\n사용 가능한 명령어: ' + Object.keys(COMMANDS).join(', '));
+      return;
     }
     
-    Log.i('[명령어 디버그] 명령어 확인됨: ' + command + ' -> ' + COMMANDS[command]);
+    Log.i('[봇] 명령어 실행: ' + command);
     
     // 백엔드 API 호출
-    Log.i('[명령어 디버그] callBackendAPI 호출 시작');
     var response = callBackendAPI(room, msg, sender);
     
-    Log.i('[명령어 디버그] callBackendAPI 응답:');
-    Log.i('  - 응답 존재: ' + (response ? 'YES' : 'NO'));
-    if (response) {
-      Log.i('  - message 필드: ' + (response.message ? 'YES (' + response.message.length + '자)' : 'NO'));
-      Log.i('  - error 필드: ' + (response.error ? 'YES (' + response.error + ')' : 'NO'));
-    }
-    
     if (response && response.message) {
-      Log.i('[명령어 디버그] 메시지 전송: ' + response.message.substring(0, Math.min(50, response.message.length)) + '...');
       replier.reply(response.message);
     } else if (response && response.error) {
-      Log.e('[명령어 디버그] 오류 응답: ' + response.error);
       replier.reply('오류: ' + response.error);
     } else {
-      Log.e('[명령어 디버그] 응답 없음');
-      replier.reply('응답을 받지 못했습니다.');
+      replier.reply('서버 응답을 받지 못했습니다.\n\n서버 상태를 확인하세요.');
     }
     
   } catch (e) {
-    Log.e('명령어 처리 오류: ' + e);
-    replier.reply('명령어 처리 중 오류가 발생했습니다.');
+    Log.e('[봇] 명령어 처리 오류: ' + e);
+    replier.reply('명령어 처리 중 오류가 발생했습니다: ' + e);
   }
 }
 
 function callBackendAPI(room, msg, sender) {
   try {
-    var baseUrl = (serverConfig && serverConfig.serverUrl) || CONFIG.INITIAL_SERVER_URL || 'https://myteamdashboard.onrender.com';
+    var baseUrl = (serverConfig && serverConfig.serverUrl) || CONFIG.INITIAL_SERVER_URL;
+    
+    if (!baseUrl) {
+      return { error: '서버 URL이 설정되지 않았습니다.' };
+    }
+    
     var url = baseUrl + '/kakao/message';
     var requestBody = JSON.stringify({
       room: room,
@@ -384,8 +376,7 @@ function callBackendAPI(room, msg, sender) {
       sender: sender
     });
     
-    Log.i('[명령어 디버그] API 요청 URL: ' + url);
-    Log.i('[명령어 디버그] 요청 본문: ' + requestBody);
+    Log.i('[봇] API 호출: ' + url);
     
     var response = org.jsoup.Jsoup.connect(url)
       .header('Content-Type', 'application/json')
@@ -395,29 +386,12 @@ function callBackendAPI(room, msg, sender) {
       .method(org.jsoup.Connection.Method.POST)
       .execute();
     
-    var statusCode = -1;
-    try {
-      statusCode = response.statusCode ? response.statusCode() : -1;
-    } catch(e) {}
-    
-    Log.i('[명령어 디버그] HTTP 상태 코드: ' + statusCode);
-    
     var text = response.body();
-    
-    Log.i('[명령어 디버그] 응답 본문 길이: ' + (text ? text.length : 0));
-    if (text && text.length > 0) {
-      var preview = text.length > 200 ? text.substring(0, 200) + '...' : text;
-      Log.i('[명령어 디버그] 응답 본문 미리보기: ' + preview);
-    }
-    
-    var parsed = JSON.parse(text);
-    Log.i('[명령어 디버그] JSON 파싱 성공');
-    return parsed;
+    return JSON.parse(text);
     
   } catch (e) {
-    Log.e('[명령어 디버그] 백엔드 API 호출 실패: ' + e);
-    Log.e('[명령어 디버그] 에러 타입: ' + (typeof e));
-    return { error: '서버 연결 실패' };
+    Log.e('[봇] API 호출 실패: ' + e);
+    return { error: '서버 연결 실패: ' + e };
   }
 }
 
@@ -840,15 +814,48 @@ function onStartCompile() {
 
 // 메시지 수신 시
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
+  // 간단한 로그
+  Log.i('[봇] 메시지 수신 - 방: ' + room + ', 발신자: ' + sender + ', 메시지: ' + msg);
+  
   try {
-    // 설정이 로드되지 않았으면 종료
-    if (!botConfig) {
+    // ========================================
+    // 1단계: 서버 연결 없이 동작하는 테스트 명령어 (최우선 처리)
+    // ========================================
+    if (msg === '테스트' || msg === 'test') {
+      replier.reply('봇 응답 테스트 성공!\n\n방 이름: [' + room + ']\n발신자: [' + sender + ']\nbotConfig: ' + (botConfig ? 'YES' : 'NO'));
       return;
     }
     
-    // 관리자 명령어 처리 (! 로 시작)
+    // 봇 정보 조회 (서버 연결 없이)
+    if (msg === '봇정보') {
+      var info = '=== 봇 정보 ===\n';
+      info += '방 이름: [' + room + ']\n';
+      info += '발신자: [' + sender + ']\n';
+      info += 'botConfig: ' + (botConfig ? 'YES' : 'NO') + '\n';
+      if (botConfig) {
+        info += '관리자: ' + (botConfig.admins ? botConfig.admins.join(', ') : '없음') + '\n';
+        info += '등록된 방: ' + (botConfig.rooms ? botConfig.rooms.length : 0) + '개\n';
+        if (botConfig.rooms) {
+          for (var r = 0; r < botConfig.rooms.length; r++) {
+            info += '  - [' + botConfig.rooms[r].roomName + ']\n';
+          }
+        }
+      }
+      replier.reply(info);
+      return;
+    }
+    
+    // ========================================
+    // 2단계: 관리자 명령어 처리 (! 로 시작)
+    // ========================================
     if (msg.startsWith('!')) {
-      // 관리자 확인
+      // botConfig 없어도 관리자 명령어 일부는 처리 가능
+      if (!botConfig) {
+        replier.reply('봇 설정이 로드되지 않았습니다.\nbotConfig: NO\n\n서버 연결을 확인하세요.');
+        return;
+      }
+      
+      // 관리자 확인 (sender와 admins 비교)
       var isAdmin = false;
       for (var j = 0; j < botConfig.admins.length; j++) {
         if (botConfig.admins[j] === sender) {
@@ -857,15 +864,31 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         }
       }
       
+      Log.i('[봇] 관리자 명령어 - sender: [' + sender + '], isAdmin: ' + isAdmin);
+      
       if (isAdmin) {
         handleAdminCommand(room, msg, sender, replier, botConfig);
       } else {
-        replier.reply('관리자 전용 명령어입니다.');
+        replier.reply('관리자 전용 명령어입니다.\n\n현재 발신자: [' + sender + ']\n등록된 관리자: ' + botConfig.admins.join(', '));
       }
       return;
     }
     
-    // 방 설정 확인
+    // ========================================
+    // 3단계: 일반 명령어 처리 (/ 로 시작)
+    // ========================================
+    if (!msg.startsWith('/')) {
+      // / 로 시작하지 않는 일반 대화는 무시
+      return;
+    }
+    
+    // botConfig 확인
+    if (!botConfig) {
+      replier.reply('봇 설정이 로드되지 않았습니다.\n\n테스트 명령어: 테스트, 봇정보');
+      return;
+    }
+    
+    // 방 설정 확인 (정확한 값 매칭)
     var roomConfig = null;
     for (var i = 0; i < botConfig.rooms.length; i++) {
       if (botConfig.rooms[i].roomName === room) {
@@ -874,15 +897,32 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
       }
     }
     
-    if (!roomConfig || !roomConfig.enabled || !roomConfig.commandsEnabled) {
+    // roomConfig를 못 찾으면 디버그 응답 (문제 파악용)
+    if (!roomConfig) {
+      Log.e('[봇] 방 미등록 - room: [' + room + ']');
+      replier.reply('이 방은 봇에 등록되지 않았습니다.\n\n현재 방 이름: [' + room + ']\n\n등록하려면 관리자가 다음 명령어를 실행하세요:\n!방추가 ' + room);
       return;
     }
     
+    // 방 비활성화 상태
+    if (!roomConfig.enabled) {
+      Log.i('[봇] 방 비활성화 - room: ' + room);
+      return; // 조용히 무시
+    }
+    
+    // 명령응답 비활성화 상태
+    if (!roomConfig.commandsEnabled) {
+      Log.i('[봇] 명령응답 비활성화 - room: ' + room);
+      return; // 조용히 무시
+    }
+    
     // 일반 명령어 처리
+    Log.i('[봇] 명령어 처리 - msg: ' + msg);
     handleCommand(room, msg, sender, replier);
     
   } catch (e) {
-    logError('메시지 처리 오류: ' + e);
+    Log.e('[봇] response 예외: ' + e);
+    replier.reply('오류 발생: ' + e);
   }
 }
 
