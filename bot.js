@@ -468,48 +468,85 @@ function handleAdminCommand(room, msg, sender, replier, config) {
   var arg2 = parts[2];
   
   try {
+    // 방 이름 추출 헬퍼 (공백 포함 이름 지원)
+    var getRoomNameArg = function(startIndex) {
+      return parts.slice(startIndex).join(' ');
+    };
+    
     switch (cmd) {
       case '!방추가':
-        if (!arg1) {
-          replier.reply('사용법: !방추가 <방이름>');
+        var roomToAdd = getRoomNameArg(1);  // "봉훈, 솔폰" 전체
+        if (!roomToAdd) {
+          replier.reply('사용법: !방추가 <방이름>\n\n💡 현재 방을 추가하려면:\n!방추가 ' + room);
           return;
         }
-        addRoom(arg1, config, replier);
+        addRoom(roomToAdd, config, replier);
         break;
         
       case '!방삭제':
-        if (!arg1) {
+        var roomToRemove = getRoomNameArg(1);
+        if (!roomToRemove) {
           replier.reply('사용법: !방삭제 <방이름>');
           return;
         }
-        removeRoom(arg1, config, replier);
+        removeRoom(roomToRemove, config, replier);
         break;
         
       case '!방':
-        if (arg1 === 'on' && arg2) {
-          toggleRoom(arg2, true, config, replier);
-        } else if (arg1 === 'off' && arg2) {
-          toggleRoom(arg2, false, config, replier);
+        if (arg1 === 'on') {
+          var roomToEnable = getRoomNameArg(2);
+          if (roomToEnable) {
+            toggleRoom(roomToEnable, true, config, replier);
+          } else {
+            replier.reply('사용법: !방 on <방이름>');
+          }
+        } else if (arg1 === 'off') {
+          var roomToDisable = getRoomNameArg(2);
+          if (roomToDisable) {
+            toggleRoom(roomToDisable, false, config, replier);
+          } else {
+            replier.reply('사용법: !방 off <방이름>');
+          }
         } else {
           replier.reply('사용법: !방 on/off <방이름>');
         }
         break;
         
       case '!일정알림':
-        if (arg1 === 'on' && arg2) {
-          toggleScheduleNotify(arg2, true, config, replier);
-        } else if (arg1 === 'off' && arg2) {
-          toggleScheduleNotify(arg2, false, config, replier);
+        if (arg1 === 'on') {
+          var roomForScheduleOn = getRoomNameArg(2);
+          if (roomForScheduleOn) {
+            toggleScheduleNotify(roomForScheduleOn, true, config, replier);
+          } else {
+            replier.reply('사용법: !일정알림 on <방이름>');
+          }
+        } else if (arg1 === 'off') {
+          var roomForScheduleOff = getRoomNameArg(2);
+          if (roomForScheduleOff) {
+            toggleScheduleNotify(roomForScheduleOff, false, config, replier);
+          } else {
+            replier.reply('사용법: !일정알림 off <방이름>');
+          }
         } else {
           replier.reply('사용법: !일정알림 on/off <방이름>');
         }
         break;
         
       case '!명령':
-        if (arg1 === 'on' && arg2) {
-          toggleCommands(arg2, true, config, replier);
-        } else if (arg1 === 'off' && arg2) {
-          toggleCommands(arg2, false, config, replier);
+        if (arg1 === 'on') {
+          var roomForCmdOn = getRoomNameArg(2);
+          if (roomForCmdOn) {
+            toggleCommands(roomForCmdOn, true, config, replier);
+          } else {
+            replier.reply('사용법: !명령 on <방이름>');
+          }
+        } else if (arg1 === 'off') {
+          var roomForCmdOff = getRoomNameArg(2);
+          if (roomForCmdOff) {
+            toggleCommands(roomForCmdOff, false, config, replier);
+          } else {
+            replier.reply('사용법: !명령 off <방이름>');
+          }
         } else {
           replier.reply('사용법: !명령 on/off <방이름>');
         }
@@ -747,31 +784,48 @@ function showStatus(config, replier) {
 // ========================================
 // 8. Outbox Handler
 // ========================================
+var isProcessingOutbox = false;  // 중복 실행 방지 플래그
+
 function startOutboxPolling(config) {
+  // 기존 타이머 완전히 정리
   if (pollingTimer) {
     clearInterval(pollingTimer);
+    pollingTimer = null;
+    Log.i('[폴링] 기존 폴링 타이머 정리');
   }
   
+  // 새 타이머 시작
   pollingTimer = setInterval(function() {
     processOutbox(config);
   }, CONFIG.POLL_INTERVAL_MS);
   
-  // 즉시 첫 실행
-  processOutbox(config);
+  Log.i('[폴링] Outbox 폴링 시작 (간격: ' + (CONFIG.POLL_INTERVAL_MS / 1000) + '초)');
   
-  Log.i('Outbox 폴링 시작 (간격: ' + (CONFIG.POLL_INTERVAL_MS / 1000) + '초)');
+  // 즉시 첫 실행 (약간의 딜레이 후)
+  setTimeout(function() {
+    processOutbox(config);
+  }, 1000);
 }
 
 function processOutbox(config) {
+  // 중복 실행 방지
+  if (isProcessingOutbox) {
+    Log.i('[폴링] 이전 처리 진행 중 - 스킵');
+    return;
+  }
+  
+  isProcessingOutbox = true;
+  
   try {
     // 1. 메시지 Pull
     var response = pullMessages(CONFIG.DEVICE_ID, CONFIG.PULL_LIMIT);
     
     if (!response || !response.items || response.items.length === 0) {
+      isProcessingOutbox = false;
       return;
     }
     
-    Log.i('메시지 ' + response.items.length + '개 수신');
+    Log.i('[폴링] 메시지 ' + response.items.length + '개 수신');
     
     var results = [];
     
@@ -780,16 +834,22 @@ function processOutbox(config) {
       var item = response.items[i];
       
       try {
-        // 방 설정 확인
-        var roomConfig = null;
-        for (var j = 0; j < config.rooms.length; j++) {
-          if (config.rooms[j].roomName === item.targetRoom) {
-            roomConfig = config.rooms[j];
-            break;
-          }
+        // 방 설정 확인 (스마트 매칭 적용)
+        var matchResult = findRoomConfigSmart(item.targetRoom, config, false);
+        var roomConfig = matchResult.roomConfig;
+        
+        if (!roomConfig) {
+          Log.e('[폴링] 방 미등록: ' + item.targetRoom);
+          results.push({
+            id: item.id,
+            status: 'failed',
+            error: 'room not found: ' + item.targetRoom
+          });
+          continue;
         }
         
-        if (!roomConfig || !roomConfig.enabled) {
+        if (!roomConfig.enabled) {
+          Log.i('[폴링] 방 비활성화: ' + item.targetRoom);
           results.push({
             id: item.id,
             status: 'failed',
@@ -855,9 +915,12 @@ function processOutbox(config) {
     
     // 3. ACK 전송
     sendAck(CONFIG.DEVICE_ID, results);
+    Log.i('[폴링] 처리 완료 - ' + results.length + '개 메시지');
     
   } catch (e) {
-    Log.e('Outbox 처리 오류: ' + e);
+    Log.e('[폴링] Outbox 처리 오류: ' + e);
+  } finally {
+    isProcessingOutbox = false;
   }
 }
 
