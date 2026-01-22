@@ -329,7 +329,70 @@ function sendAck(deviceId, results) {
 }
 
 // ========================================
-// 6. Command Handler
+// 6. 스마트 방 매칭 함수
+// ========================================
+// 방 이름이 변경되었을 때 (멤버 추가/삭제) 자동으로 감지하고 업데이트
+function findRoomConfigSmart(currentRoom, config, autoUpdate) {
+  // 1. 정확한 매칭 먼저 시도
+  for (var i = 0; i < config.rooms.length; i++) {
+    if (config.rooms[i].roomName === currentRoom) {
+      return { roomConfig: config.rooms[i], updated: false };
+    }
+  }
+  
+  // 2. 부분 매칭 시도 (등록된 이름이 현재 방 이름에 포함되는 경우)
+  // 예: 등록된 "봉훈"이 현재 "봉훈, 솔폰"에 포함됨
+  for (var i = 0; i < config.rooms.length; i++) {
+    var registeredName = config.rooms[i].roomName;
+    
+    // 현재 방 이름에 등록된 이름이 포함되어 있는지 확인
+    if (currentRoom.indexOf(registeredName) !== -1) {
+      var oldName = config.rooms[i].roomName;
+      
+      // 자동 업데이트
+      if (autoUpdate) {
+        config.rooms[i].roomName = currentRoom;
+        var success = updateConfig(config);
+        if (success) {
+          Log.i('[자동업데이트] 방 이름 변경 성공: [' + oldName + '] → [' + currentRoom + ']');
+        } else {
+          Log.e('[자동업데이트] 방 이름 변경 실패: [' + oldName + '] → [' + currentRoom + ']');
+        }
+      }
+      
+      return { roomConfig: config.rooms[i], updated: true, oldName: oldName };
+    }
+  }
+  
+  // 3. 역방향 부분 매칭 (현재 방 이름이 등록된 이름에 포함되는 경우)
+  // 예: 현재 "봉훈"이 등록된 "봉훈, 솔폰"에 포함됨 (멤버가 나간 경우)
+  for (var i = 0; i < config.rooms.length; i++) {
+    var registeredName = config.rooms[i].roomName;
+    
+    if (registeredName.indexOf(currentRoom) !== -1) {
+      var oldName = config.rooms[i].roomName;
+      
+      // 자동 업데이트
+      if (autoUpdate) {
+        config.rooms[i].roomName = currentRoom;
+        var success = updateConfig(config);
+        if (success) {
+          Log.i('[자동업데이트] 방 이름 변경 성공: [' + oldName + '] → [' + currentRoom + ']');
+        } else {
+          Log.e('[자동업데이트] 방 이름 변경 실패: [' + oldName + '] → [' + currentRoom + ']');
+        }
+      }
+      
+      return { roomConfig: config.rooms[i], updated: true, oldName: oldName };
+    }
+  }
+  
+  // 매칭 실패
+  return { roomConfig: null, updated: false };
+}
+
+// ========================================
+// 7. Command Handler
 // ========================================
 function handleCommand(room, msg, sender, replier) {
   try {
@@ -470,8 +533,50 @@ function handleAdminCommand(room, msg, sender, replier, config) {
         replier.reply('=== 방 정보 ===\n방 이름: [' + room + ']\n요청자: [' + sender + ']\n\n※ 이 방 이름을 사용하여 !방추가 명령어를 실행하세요.');
         break;
         
+      case '!방업데이트':
+        // 기존 방 이름을 현재 방 이름으로 업데이트
+        if (!arg1) {
+          // 인자 없이 호출 시 자동 매칭 시도
+          var result = findRoomConfigSmart(room, config, false);
+          if (result.roomConfig && result.oldName) {
+            // 부분 매칭 성공 - 업데이트 수행
+            result.roomConfig.roomName = room;
+            var success = updateConfig(config);
+            if (success) {
+              replier.reply('방 이름 업데이트 완료!\n\n기존: [' + result.oldName + ']\n변경: [' + room + ']');
+            } else {
+              replier.reply('방 이름 업데이트 실패 (서버 오류)');
+            }
+          } else if (result.roomConfig) {
+            replier.reply('이 방은 이미 정확히 등록되어 있습니다.\n\n방 이름: [' + room + ']');
+          } else {
+            replier.reply('업데이트할 방을 찾을 수 없습니다.\n\n현재 방: [' + room + ']\n\n새로 등록하려면: !방추가 ' + room);
+          }
+        } else {
+          // 명시적으로 기존 방 이름 지정
+          var oldRoomName = parts.slice(1).join(' '); // 공백 포함 방 이름 지원
+          var found = false;
+          for (var i = 0; i < config.rooms.length; i++) {
+            if (config.rooms[i].roomName === oldRoomName) {
+              config.rooms[i].roomName = room;
+              var success = updateConfig(config);
+              if (success) {
+                replier.reply('방 이름 업데이트 완료!\n\n기존: [' + oldRoomName + ']\n변경: [' + room + ']');
+              } else {
+                replier.reply('방 이름 업데이트 실패 (서버 오류)');
+              }
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            replier.reply('기존 방을 찾을 수 없습니다: [' + oldRoomName + ']\n\n등록된 방 목록을 확인하세요: !방목록');
+          }
+        }
+        break;
+        
       default:
-        replier.reply('알 수 없는 명령어: ' + cmd + '\n\n사용 가능한 명령어:\n!방추가, !방삭제, !방, !일정알림, !명령, !방목록, !상태, !방이름');
+        replier.reply('알 수 없는 명령어: ' + cmd + '\n\n사용 가능한 명령어:\n!방추가, !방삭제, !방, !일정알림, !명령, !방목록, !상태, !방이름, !방업데이트');
     }
   } catch (e) {
     replier.reply('오류 발생: ' + e);
@@ -941,23 +1046,22 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
       return;
     }
     
-    // 방 설정 확인 (정확한 값 매칭) - 상세 로그 추가
-    Log.i('[DEBUG] 방 설정 확인 시작 - rooms 수: ' + botConfig.rooms.length);
-    var roomConfig = null;
-    for (var i = 0; i < botConfig.rooms.length; i++) {
-      var roomName = botConfig.rooms[i].roomName;
-      var match = (roomName === room);
-      Log.i('[DEBUG] 비교[' + i + ']: roomName=[' + roomName + '] (길이:' + roomName.length + ') vs room=[' + room + '] (길이:' + room.length + ') → ' + (match ? 'MATCH!' : 'NO'));
-      if (match) {
-        roomConfig = botConfig.rooms[i];
-        break;
-      }
+    // 방 설정 확인 (스마트 매칭 - 자동 업데이트 포함)
+    Log.i('[DEBUG] 방 설정 확인 시작 (스마트 매칭) - rooms 수: ' + botConfig.rooms.length);
+    var matchResult = findRoomConfigSmart(room, botConfig, true); // autoUpdate = true
+    var roomConfig = matchResult.roomConfig;
+    
+    // 자동 업데이트가 수행된 경우 알림
+    if (matchResult.updated && matchResult.oldName) {
+      Log.i('[DEBUG] 방 이름 자동 업데이트됨: [' + matchResult.oldName + '] → [' + room + ']');
+      // 사용자에게 알림 (선택적)
+      replier.reply('📢 방 이름이 변경되어 자동 업데이트되었습니다.\n\n기존: [' + matchResult.oldName + ']\n변경: [' + room + ']');
     }
     
     // roomConfig를 못 찾으면 디버그 응답 (문제 파악용)
     if (!roomConfig) {
       Log.e('[DEBUG] 방 미등록 - room: [' + room + '] (길이:' + room.length + ')');
-      replier.reply('이 방은 봇에 등록되지 않았습니다.\n\n현재 방 이름: [' + room + '] (길이:' + room.length + ')\n\n등록하려면 관리자가 다음 명령어를 실행하세요:\n!방추가 ' + room);
+      replier.reply('이 방은 봇에 등록되지 않았습니다.\n\n현재 방 이름: [' + room + ']\n\n등록하려면 관리자가 다음 명령어를 실행하세요:\n!방추가 ' + room);
       return;
     }
     
