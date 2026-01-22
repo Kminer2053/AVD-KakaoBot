@@ -812,17 +812,46 @@ function onStartCompile() {
   }
 }
 
+// 문자열의 각 문자 코드를 출력하는 헬퍼 함수
+function getCharCodes(str) {
+  var codes = [];
+  for (var i = 0; i < str.length; i++) {
+    codes.push(str.charCodeAt(i));
+  }
+  return codes.join(',');
+}
+
 // 메시지 수신 시
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
-  // 간단한 로그
-  Log.i('[봇] 메시지 수신 - 방: ' + room + ', 발신자: ' + sender + ', 메시지: ' + msg);
+  // 상세 로그: sender 값과 문자 코드까지 출력
+  Log.i('[DEBUG] ========== 메시지 수신 ==========');
+  Log.i('[DEBUG] 방: [' + room + ']');
+  Log.i('[DEBUG] 발신자: [' + sender + ']');
+  Log.i('[DEBUG] 발신자 길이: ' + sender.length);
+  Log.i('[DEBUG] 발신자 charCodes: ' + getCharCodes(sender));
+  Log.i('[DEBUG] 메시지: [' + msg + ']');
   
   try {
     // ========================================
     // 1단계: 서버 연결 없이 동작하는 테스트 명령어 (최우선 처리)
     // ========================================
     if (msg === '테스트' || msg === 'test') {
-      replier.reply('봇 응답 테스트 성공!\n\n방 이름: [' + room + ']\n발신자: [' + sender + ']\nbotConfig: ' + (botConfig ? 'YES' : 'NO'));
+      // 상세 디버그 정보 포함
+      var debugInfo = '봇 응답 테스트 성공!\n\n';
+      debugInfo += '방 이름: [' + room + ']\n';
+      debugInfo += '발신자: [' + sender + ']\n';
+      debugInfo += '발신자 길이: ' + sender.length + '\n';
+      debugInfo += '발신자 charCodes: ' + getCharCodes(sender) + '\n';
+      debugInfo += 'botConfig: ' + (botConfig ? 'YES' : 'NO') + '\n';
+      if (botConfig && botConfig.admins) {
+        debugInfo += '\n=== 관리자 목록 ===\n';
+        for (var a = 0; a < botConfig.admins.length; a++) {
+          var admin = botConfig.admins[a];
+          debugInfo += '관리자[' + a + ']: [' + admin + '] (길이:' + admin.length + ', codes:' + getCharCodes(admin) + ')\n';
+          debugInfo += '  → sender와 일치: ' + (admin === sender ? 'YES' : 'NO') + '\n';
+        }
+      }
+      replier.reply(debugInfo);
       return;
     }
     
@@ -831,13 +860,24 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
       var info = '=== 봇 정보 ===\n';
       info += '방 이름: [' + room + ']\n';
       info += '발신자: [' + sender + ']\n';
+      info += '발신자 길이: ' + sender.length + '\n';
+      info += '발신자 charCodes: ' + getCharCodes(sender) + '\n';
       info += 'botConfig: ' + (botConfig ? 'YES' : 'NO') + '\n';
       if (botConfig) {
-        info += '관리자: ' + (botConfig.admins ? botConfig.admins.join(', ') : '없음') + '\n';
-        info += '등록된 방: ' + (botConfig.rooms ? botConfig.rooms.length : 0) + '개\n';
+        info += '\n=== 관리자 목록 ===\n';
+        if (botConfig.admins) {
+          for (var a = 0; a < botConfig.admins.length; a++) {
+            var admin = botConfig.admins[a];
+            info += '[' + a + ']: [' + admin + '] (길이:' + admin.length + ')\n';
+            info += '  → sender 일치: ' + (admin === sender ? 'YES' : 'NO') + '\n';
+          }
+        }
+        info += '\n=== 등록된 방 ===\n';
         if (botConfig.rooms) {
           for (var r = 0; r < botConfig.rooms.length; r++) {
-            info += '  - [' + botConfig.rooms[r].roomName + ']\n';
+            var rm = botConfig.rooms[r];
+            info += '[' + r + ']: [' + rm.roomName + '] (길이:' + rm.roomName.length + ')\n';
+            info += '  → 현재방 일치: ' + (rm.roomName === room ? 'YES' : 'NO') + '\n';
           }
         }
       }
@@ -849,27 +889,36 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     // 2단계: 관리자 명령어 처리 (! 로 시작)
     // ========================================
     if (msg.startsWith('!')) {
+      Log.i('[DEBUG] 관리자 명령어 감지: ' + msg);
+      
       // botConfig 없어도 관리자 명령어 일부는 처리 가능
       if (!botConfig) {
+        Log.e('[DEBUG] botConfig가 없음!');
         replier.reply('봇 설정이 로드되지 않았습니다.\nbotConfig: NO\n\n서버 연결을 확인하세요.');
         return;
       }
       
-      // 관리자 확인 (sender와 admins 비교)
+      // 관리자 확인 (sender와 admins 비교) - 상세 로그 추가
+      Log.i('[DEBUG] 관리자 체크 시작 - admins 수: ' + botConfig.admins.length);
       var isAdmin = false;
       for (var j = 0; j < botConfig.admins.length; j++) {
-        if (botConfig.admins[j] === sender) {
+        var adminName = botConfig.admins[j];
+        var match = (adminName === sender);
+        Log.i('[DEBUG] 비교[' + j + ']: admin=[' + adminName + '] (길이:' + adminName.length + ') vs sender=[' + sender + '] (길이:' + sender.length + ') → ' + (match ? 'MATCH!' : 'NO'));
+        if (match) {
           isAdmin = true;
           break;
         }
       }
       
-      Log.i('[봇] 관리자 명령어 - sender: [' + sender + '], isAdmin: ' + isAdmin);
+      Log.i('[DEBUG] 관리자 체크 결과: isAdmin=' + isAdmin);
       
       if (isAdmin) {
+        Log.i('[DEBUG] 관리자 명령어 처리 시작');
         handleAdminCommand(room, msg, sender, replier, botConfig);
       } else {
-        replier.reply('관리자 전용 명령어입니다.\n\n현재 발신자: [' + sender + ']\n등록된 관리자: ' + botConfig.admins.join(', '));
+        Log.i('[DEBUG] 관리자 아님 - 명령어 거부');
+        replier.reply('관리자 전용 명령어입니다.\n\n현재 발신자: [' + sender + '] (길이:' + sender.length + ')\n등록된 관리자: ' + botConfig.admins.join(', '));
       }
       return;
     }
@@ -879,19 +928,27 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     // ========================================
     if (!msg.startsWith('/')) {
       // / 로 시작하지 않는 일반 대화는 무시
+      Log.i('[DEBUG] /로 시작하지 않음 - 무시');
       return;
     }
     
+    Log.i('[DEBUG] 일반 명령어 감지: ' + msg);
+    
     // botConfig 확인
     if (!botConfig) {
+      Log.e('[DEBUG] botConfig가 없음!');
       replier.reply('봇 설정이 로드되지 않았습니다.\n\n테스트 명령어: 테스트, 봇정보');
       return;
     }
     
-    // 방 설정 확인 (정확한 값 매칭)
+    // 방 설정 확인 (정확한 값 매칭) - 상세 로그 추가
+    Log.i('[DEBUG] 방 설정 확인 시작 - rooms 수: ' + botConfig.rooms.length);
     var roomConfig = null;
     for (var i = 0; i < botConfig.rooms.length; i++) {
-      if (botConfig.rooms[i].roomName === room) {
+      var roomName = botConfig.rooms[i].roomName;
+      var match = (roomName === room);
+      Log.i('[DEBUG] 비교[' + i + ']: roomName=[' + roomName + '] (길이:' + roomName.length + ') vs room=[' + room + '] (길이:' + room.length + ') → ' + (match ? 'MATCH!' : 'NO'));
+      if (match) {
         roomConfig = botConfig.rooms[i];
         break;
       }
@@ -899,29 +956,31 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     
     // roomConfig를 못 찾으면 디버그 응답 (문제 파악용)
     if (!roomConfig) {
-      Log.e('[봇] 방 미등록 - room: [' + room + ']');
-      replier.reply('이 방은 봇에 등록되지 않았습니다.\n\n현재 방 이름: [' + room + ']\n\n등록하려면 관리자가 다음 명령어를 실행하세요:\n!방추가 ' + room);
+      Log.e('[DEBUG] 방 미등록 - room: [' + room + '] (길이:' + room.length + ')');
+      replier.reply('이 방은 봇에 등록되지 않았습니다.\n\n현재 방 이름: [' + room + '] (길이:' + room.length + ')\n\n등록하려면 관리자가 다음 명령어를 실행하세요:\n!방추가 ' + room);
       return;
     }
     
+    Log.i('[DEBUG] 방 찾음 - enabled:' + roomConfig.enabled + ', commandsEnabled:' + roomConfig.commandsEnabled);
+    
     // 방 비활성화 상태
     if (!roomConfig.enabled) {
-      Log.i('[봇] 방 비활성화 - room: ' + room);
+      Log.i('[DEBUG] 방 비활성화 - 무시');
       return; // 조용히 무시
     }
     
     // 명령응답 비활성화 상태
     if (!roomConfig.commandsEnabled) {
-      Log.i('[봇] 명령응답 비활성화 - room: ' + room);
+      Log.i('[DEBUG] 명령응답 비활성화 - 무시');
       return; // 조용히 무시
     }
     
     // 일반 명령어 처리
-    Log.i('[봇] 명령어 처리 - msg: ' + msg);
+    Log.i('[DEBUG] handleCommand 호출 - msg: ' + msg);
     handleCommand(room, msg, sender, replier);
     
   } catch (e) {
-    Log.e('[봇] response 예외: ' + e);
+    Log.e('[DEBUG] response 예외: ' + e);
     replier.reply('오류 발생: ' + e);
   }
 }
