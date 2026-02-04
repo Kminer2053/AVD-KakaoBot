@@ -1,12 +1,30 @@
 // ========================================
 // AVD 카카오톡 봇 (메신저봇R 단일 파일 버전)
+// API2 하이브리드 버전 (API1 이벤트 + API2 메시지 전송)
 // ========================================
+
+// Bot 객체 초기화 (API2) - 안전하게 처리
+var Bot = null;
+try {
+  if (typeof BotManager !== 'undefined' && BotManager.getCurrentBot) {
+    Bot = BotManager.getCurrentBot();
+    Log.i('[스크립트 로드] Bot 객체 초기화 완료 (API2)');
+  } else {
+    Log.i('[스크립트 로드] BotManager를 찾을 수 없습니다. API1 모드로 동작합니다.');
+  }
+} catch(e) {
+  Log.e('[스크립트 로드] BotManager 초기화 실패: ' + e);
+}
 
 // 스크립트 로드 확인 로그
 try {
   Log.i('========================================');
   Log.i('[스크립트 로드] bot.js 파일이 로드되었습니다');
-  Log.i('[스크립트 로드] 모든 변수/함수 정의 후 onStartCompile() 호출 예정');
+  if (Bot) {
+    Log.i('[스크립트 로드] API2 모드 활성화');
+  } else {
+    Log.i('[스크립트 로드] API1 모드로 동작 (BotManager 없음)');
+  }
   Log.i('========================================');
 } catch(e) {
   // Log 객체가 아직 없을 수 있음
@@ -22,11 +40,11 @@ var CONFIG = {
   
   // 초기 연결용 서버 URL (백엔드 서버 주소)
   // 예: 'https://myteamdashboard.onrender.com'
-  INITIAL_SERVER_URL: '',  // ← 여기에 서버 주소 입력
+  INITIAL_SERVER_URL: 'https://myteamdashboard.onrender.com',
   
   // 초기 연결용 봇 토큰 (백엔드 .env의 BOT_API_TOKEN과 동일한 값)
   // 백엔드 서버 관리자에게 문의하여 토큰 값을 받아서 입력하세요
-  INITIAL_BOT_TOKEN: '',  // ← 여기에 토큰 입력
+  INITIAL_BOT_TOKEN: '5992f83a8a73b5fe8ef90ef6d85c0725a0aa3a148ecf4e10cf053acc7225c74d',
   
   // ========================================
   
@@ -392,16 +410,16 @@ function findRoomConfigSmart(currentRoom, config, autoUpdate) {
 }
 
 // ========================================
-// 7. Command Handler
+// 7. Command Handler (API2)
 // ========================================
-function handleCommand(room, msg, sender, replier) {
+function handleCommand(room, msg, sender, Message) {
   try {
     var command = msg.trim();
     
     // 명령어 확인
     if (!COMMANDS[command]) {
       // 알 수 없는 /명령어는 도움말 안내
-      replier.reply('알 수 없는 명령어입니다: ' + command + '\n\n사용 가능한 명령어: ' + Object.keys(COMMANDS).join(', '));
+      Message.reply('알 수 없는 명령어입니다: ' + command + '\n\n사용 가능한 명령어: ' + Object.keys(COMMANDS).join(', '));
       return;
     }
     
@@ -411,16 +429,16 @@ function handleCommand(room, msg, sender, replier) {
     var response = callBackendAPI(room, msg, sender);
     
     if (response && response.message) {
-      replier.reply(response.message);
+      Message.reply(response.message);
     } else if (response && response.error) {
-      replier.reply('오류: ' + response.error);
+      Message.reply('오류: ' + response.error);
     } else {
-      replier.reply('서버 응답을 받지 못했습니다.\n\n서버 상태를 확인하세요.');
+      Message.reply('서버 응답을 받지 못했습니다.\n\n서버 상태를 확인하세요.');
     }
     
   } catch (e) {
     Log.e('[봇] 명령어 처리 오류: ' + e);
-    replier.reply('명령어 처리 중 오류가 발생했습니다: ' + e);
+    Message.reply('명령어 처리 중 오류가 발생했습니다: ' + e);
   }
 }
 
@@ -459,9 +477,9 @@ function callBackendAPI(room, msg, sender) {
 }
 
 // ========================================
-// 7. Admin Handler
+// 7. Admin Handler (API2)
 // ========================================
-function handleAdminCommand(room, msg, sender, replier, config) {
+function handleAdminCommand(room, msg, sender, Message, config) {
   var parts = msg.trim().split(/\s+/);
   var cmd = parts[0];
   var arg1 = parts[1];
@@ -477,38 +495,38 @@ function handleAdminCommand(room, msg, sender, replier, config) {
       case '!방추가':
         var roomToAdd = getRoomNameArg(1);  // "봉훈, 솔폰" 전체
         if (!roomToAdd) {
-          replier.reply('사용법: !방추가 <방이름>\n\n💡 현재 방을 추가하려면:\n!방추가 ' + room);
+          Message.reply('사용법: !방추가 <방이름>\n\n💡 현재 방을 추가하려면:\n!방추가 ' + room);
           return;
         }
-        addRoom(roomToAdd, config, replier);
+        addRoom(roomToAdd, config, Message);
         break;
         
       case '!방삭제':
         var roomToRemove = getRoomNameArg(1);
         if (!roomToRemove) {
-          replier.reply('사용법: !방삭제 <방이름>');
+          Message.reply('사용법: !방삭제 <방이름>');
           return;
         }
-        removeRoom(roomToRemove, config, replier);
+        removeRoom(roomToRemove, config, Message);
         break;
         
       case '!방':
         if (arg1 === 'on') {
           var roomToEnable = getRoomNameArg(2);
           if (roomToEnable) {
-            toggleRoom(roomToEnable, true, config, replier);
+            toggleRoom(roomToEnable, true, config, Message);
           } else {
-            replier.reply('사용법: !방 on <방이름>');
+            Message.reply('사용법: !방 on <방이름>');
           }
         } else if (arg1 === 'off') {
           var roomToDisable = getRoomNameArg(2);
           if (roomToDisable) {
-            toggleRoom(roomToDisable, false, config, replier);
+            toggleRoom(roomToDisable, false, config, Message);
           } else {
-            replier.reply('사용법: !방 off <방이름>');
+            Message.reply('사용법: !방 off <방이름>');
           }
         } else {
-          replier.reply('사용법: !방 on/off <방이름>');
+          Message.reply('사용법: !방 on/off <방이름>');
         }
         break;
         
@@ -516,19 +534,19 @@ function handleAdminCommand(room, msg, sender, replier, config) {
         if (arg1 === 'on') {
           var roomForScheduleOn = getRoomNameArg(2);
           if (roomForScheduleOn) {
-            toggleScheduleNotify(roomForScheduleOn, true, config, replier);
+            toggleScheduleNotify(roomForScheduleOn, true, config, Message);
           } else {
-            replier.reply('사용법: !일정알림 on <방이름>');
+            Message.reply('사용법: !일정알림 on <방이름>');
           }
         } else if (arg1 === 'off') {
           var roomForScheduleOff = getRoomNameArg(2);
           if (roomForScheduleOff) {
-            toggleScheduleNotify(roomForScheduleOff, false, config, replier);
+            toggleScheduleNotify(roomForScheduleOff, false, config, Message);
           } else {
-            replier.reply('사용법: !일정알림 off <방이름>');
+            Message.reply('사용법: !일정알림 off <방이름>');
           }
         } else {
-          replier.reply('사용법: !일정알림 on/off <방이름>');
+          Message.reply('사용법: !일정알림 on/off <방이름>');
         }
         break;
         
@@ -536,28 +554,28 @@ function handleAdminCommand(room, msg, sender, replier, config) {
         if (arg1 === 'on') {
           var roomForCmdOn = getRoomNameArg(2);
           if (roomForCmdOn) {
-            toggleCommands(roomForCmdOn, true, config, replier);
+            toggleCommands(roomForCmdOn, true, config, Message);
           } else {
-            replier.reply('사용법: !명령 on <방이름>');
+            Message.reply('사용법: !명령 on <방이름>');
           }
         } else if (arg1 === 'off') {
           var roomForCmdOff = getRoomNameArg(2);
           if (roomForCmdOff) {
-            toggleCommands(roomForCmdOff, false, config, replier);
+            toggleCommands(roomForCmdOff, false, config, Message);
           } else {
-            replier.reply('사용법: !명령 off <방이름>');
+            Message.reply('사용법: !명령 off <방이름>');
           }
         } else {
-          replier.reply('사용법: !명령 on/off <방이름>');
+          Message.reply('사용법: !명령 on/off <방이름>');
         }
         break;
         
       case '!방목록':
-        listRooms(config, replier);
+        listRooms(config, Message);
         break;
         
       case '!상태':
-        showStatus(config, replier);
+        showStatus(config, Message);
         break;
         
       case '!방이름':
@@ -567,7 +585,7 @@ function handleAdminCommand(room, msg, sender, replier, config) {
         Log.i('방 이름(room): [' + room + ']');
         Log.i('요청자(sender): [' + sender + ']');
         Log.i('========================================');
-        replier.reply('=== 방 정보 ===\n방 이름: [' + room + ']\n요청자: [' + sender + ']\n\n※ 이 방 이름을 사용하여 !방추가 명령어를 실행하세요.');
+        Message.reply('=== 방 정보 ===\n방 이름: [' + room + ']\n요청자: [' + sender + ']\n\n※ 이 방 이름을 사용하여 !방추가 명령어를 실행하세요.');
         break;
         
       case '!방업데이트':
@@ -580,14 +598,14 @@ function handleAdminCommand(room, msg, sender, replier, config) {
             result.roomConfig.roomName = room;
             var success = updateConfig(config);
             if (success) {
-              replier.reply('방 이름 업데이트 완료!\n\n기존: [' + result.oldName + ']\n변경: [' + room + ']');
+              Message.reply('방 이름 업데이트 완료!\n\n기존: [' + result.oldName + ']\n변경: [' + room + ']');
             } else {
-              replier.reply('방 이름 업데이트 실패 (서버 오류)');
+              Message.reply('방 이름 업데이트 실패 (서버 오류)');
             }
           } else if (result.roomConfig) {
-            replier.reply('이 방은 이미 정확히 등록되어 있습니다.\n\n방 이름: [' + room + ']');
+            Message.reply('이 방은 이미 정확히 등록되어 있습니다.\n\n방 이름: [' + room + ']');
           } else {
-            replier.reply('업데이트할 방을 찾을 수 없습니다.\n\n현재 방: [' + room + ']\n\n새로 등록하려면: !방추가 ' + room);
+            Message.reply('업데이트할 방을 찾을 수 없습니다.\n\n현재 방: [' + room + ']\n\n새로 등록하려면: !방추가 ' + room);
           }
         } else {
           // 명시적으로 기존 방 이름 지정
@@ -598,34 +616,34 @@ function handleAdminCommand(room, msg, sender, replier, config) {
               config.rooms[i].roomName = room;
               var success = updateConfig(config);
               if (success) {
-                replier.reply('방 이름 업데이트 완료!\n\n기존: [' + oldRoomName + ']\n변경: [' + room + ']');
+                Message.reply('방 이름 업데이트 완료!\n\n기존: [' + oldRoomName + ']\n변경: [' + room + ']');
               } else {
-                replier.reply('방 이름 업데이트 실패 (서버 오류)');
+                Message.reply('방 이름 업데이트 실패 (서버 오류)');
               }
               found = true;
               break;
             }
           }
           if (!found) {
-            replier.reply('기존 방을 찾을 수 없습니다: [' + oldRoomName + ']\n\n등록된 방 목록을 확인하세요: !방목록');
+            Message.reply('기존 방을 찾을 수 없습니다: [' + oldRoomName + ']\n\n등록된 방 목록을 확인하세요: !방목록');
           }
         }
         break;
         
       default:
-        replier.reply('알 수 없는 명령어: ' + cmd + '\n\n사용 가능한 명령어:\n!방추가, !방삭제, !방, !일정알림, !명령, !방목록, !상태, !방이름, !방업데이트');
+        Message.reply('알 수 없는 명령어: ' + cmd + '\n\n사용 가능한 명령어:\n!방추가, !방삭제, !방, !일정알림, !명령, !방목록, !상태, !방이름, !방업데이트');
     }
   } catch (e) {
-    replier.reply('오류 발생: ' + e);
+    Message.reply('오류 발생: ' + e);
     Log.e('관리자 명령 오류: ' + e);
   }
 }
 
-function addRoom(roomName, config, replier) {
+function addRoom(roomName, config, Message) {
   // 이미 존재하는지 확인
   for (var i = 0; i < config.rooms.length; i++) {
     if (config.rooms[i].roomName === roomName) {
-      replier.reply('이미 존재하는 방입니다: ' + roomName);
+      Message.reply('이미 존재하는 방입니다: ' + roomName);
       return;
     }
   }
@@ -639,13 +657,13 @@ function addRoom(roomName, config, replier) {
   
   var success = updateConfig(config);
   if (success) {
-    replier.reply('방 추가 완료: ' + roomName);
+    Message.reply('방 추가 완료: ' + roomName);
   } else {
-    replier.reply('방 추가 실패 (서버 오류)');
+    Message.reply('방 추가 실패 (서버 오류)');
   }
 }
 
-function removeRoom(roomName, config, replier) {
+function removeRoom(roomName, config, Message) {
   var found = false;
   var newRooms = [];
   
@@ -658,7 +676,7 @@ function removeRoom(roomName, config, replier) {
   }
   
   if (!found) {
-    replier.reply('방을 찾을 수 없습니다: ' + roomName);
+    Message.reply('방을 찾을 수 없습니다: ' + roomName);
     return;
   }
   
@@ -666,13 +684,13 @@ function removeRoom(roomName, config, replier) {
   
   var success = updateConfig(config);
   if (success) {
-    replier.reply('방 삭제 완료: ' + roomName);
+    Message.reply('방 삭제 완료: ' + roomName);
   } else {
-    replier.reply('방 삭제 실패 (서버 오류)');
+    Message.reply('방 삭제 실패 (서버 오류)');
   }
 }
 
-function toggleRoom(roomName, enabled, config, replier) {
+function toggleRoom(roomName, enabled, config, Message) {
   var room = null;
   for (var i = 0; i < config.rooms.length; i++) {
     if (config.rooms[i].roomName === roomName) {
@@ -682,7 +700,7 @@ function toggleRoom(roomName, enabled, config, replier) {
   }
   
   if (!room) {
-    replier.reply('방을 찾을 수 없습니다: ' + roomName);
+    Message.reply('방을 찾을 수 없습니다: ' + roomName);
     return;
   }
   
@@ -690,13 +708,13 @@ function toggleRoom(roomName, enabled, config, replier) {
   
   var success = updateConfig(config);
   if (success) {
-    replier.reply(roomName + ' 방 ' + (enabled ? '활성화' : '비활성화') + ' 완료');
+    Message.reply(roomName + ' 방 ' + (enabled ? '활성화' : '비활성화') + ' 완료');
   } else {
-    replier.reply('설정 변경 실패 (서버 오류)');
+    Message.reply('설정 변경 실패 (서버 오류)');
   }
 }
 
-function toggleScheduleNotify(roomName, enabled, config, replier) {
+function toggleScheduleNotify(roomName, enabled, config, Message) {
   var room = null;
   for (var i = 0; i < config.rooms.length; i++) {
     if (config.rooms[i].roomName === roomName) {
@@ -706,7 +724,7 @@ function toggleScheduleNotify(roomName, enabled, config, replier) {
   }
   
   if (!room) {
-    replier.reply('방을 찾을 수 없습니다: ' + roomName);
+    Message.reply('방을 찾을 수 없습니다: ' + roomName);
     return;
   }
   
@@ -714,13 +732,13 @@ function toggleScheduleNotify(roomName, enabled, config, replier) {
   
   var success = updateConfig(config);
   if (success) {
-    replier.reply(roomName + ' 방 일정알림 ' + (enabled ? 'ON' : 'OFF') + ' 완료');
+    Message.reply(roomName + ' 방 일정알림 ' + (enabled ? 'ON' : 'OFF') + ' 완료');
   } else {
-    replier.reply('설정 변경 실패 (서버 오류)');
+    Message.reply('설정 변경 실패 (서버 오류)');
   }
 }
 
-function toggleCommands(roomName, enabled, config, replier) {
+function toggleCommands(roomName, enabled, config, Message) {
   var room = null;
   for (var i = 0; i < config.rooms.length; i++) {
     if (config.rooms[i].roomName === roomName) {
@@ -730,7 +748,7 @@ function toggleCommands(roomName, enabled, config, replier) {
   }
   
   if (!room) {
-    replier.reply('방을 찾을 수 없습니다: ' + roomName);
+    Message.reply('방을 찾을 수 없습니다: ' + roomName);
     return;
   }
   
@@ -738,15 +756,15 @@ function toggleCommands(roomName, enabled, config, replier) {
   
   var success = updateConfig(config);
   if (success) {
-    replier.reply(roomName + ' 방 명령응답 ' + (enabled ? 'ON' : 'OFF') + ' 완료');
+    Message.reply(roomName + ' 방 명령응답 ' + (enabled ? 'ON' : 'OFF') + ' 완료');
   } else {
-    replier.reply('설정 변경 실패 (서버 오류)');
+    Message.reply('설정 변경 실패 (서버 오류)');
   }
 }
 
-function listRooms(config, replier) {
+function listRooms(config, Message) {
   if (config.rooms.length === 0) {
-    replier.reply('등록된 방이 없습니다.');
+    Message.reply('등록된 방이 없습니다.');
     return;
   }
   
@@ -759,10 +777,10 @@ function listRooms(config, replier) {
     msg += '   명령응답: ' + (r.commandsEnabled ? 'ON' : 'OFF') + '\n\n';
   }
   
-  replier.reply(msg);
+  Message.reply(msg);
 }
 
-function showStatus(config, replier) {
+function showStatus(config, Message) {
   var enabledRooms = 0;
   for (var i = 0; i < config.rooms.length; i++) {
     if (config.rooms[i].enabled) {
@@ -778,7 +796,7 @@ function showStatus(config, replier) {
             '활성 방: ' + enabledRooms + '/' + config.rooms.length + '\n' +
             '관리자: ' + config.admins.join(', ');
   
-  replier.reply(msg);
+  Message.reply(msg);
 }
 
 // ========================================
@@ -861,20 +879,62 @@ function processOutbox(config) {
         // 메시지 분할 (3000자 초과 시)
         var messages = splitMessage(item.message, CONFIG.MAX_MESSAGE_LENGTH);
         
-        // 메시지 전송
+        // 방 세션 확인 (API2 - Bot이 있을 경우만)
+        if (Bot && Bot.canReply) {
+          if (!Bot.canReply(item.targetRoom)) {
+            Log.e('[폴링] 방 세션 없음: ' + item.targetRoom);
+            results.push({
+              id: item.id,
+              status: 'failed',
+              error: 'room session missing'
+            });
+            continue;
+          }
+        }
+        
+        // 메시지 전송 (API2 우선, 없으면 API1)
         var success = true;
         var sendError = null;
         for (var k = 0; k < messages.length; k++) {
           try {
             Log.i('[메시지 전송 시도] 방: ' + item.targetRoom + ', 청크: ' + (k + 1) + '/' + messages.length);
-            var sent = Api.replyRoom(item.targetRoom, messages[k]);
+            var sent = false;
+            
+            // API2 사용 시도
+            if (Bot && Bot.send) {
+              try {
+                sent = Bot.send(item.targetRoom, messages[k]);
+                if (sent) {
+                  Log.i('[메시지 전송 성공] Bot.send (API2) - 방: ' + item.targetRoom + ', 청크: ' + (k + 1) + '/' + messages.length);
+                } else {
+                  Log.e('[메시지 전송 실패] Bot.send가 false를 반환했습니다. 방: ' + item.targetRoom);
+                }
+              } catch (botError) {
+                Log.e('[메시지 전송] Bot.send 오류: ' + botError + ', API1로 fallback');
+                sent = false;
+              }
+            }
+            
+            // API2 실패 시 API1 사용
             if (!sent) {
-              Log.e('[메시지 전송 실패] Api.replyRoom이 false를 반환했습니다. 방: ' + item.targetRoom);
+              if (typeof Api !== 'undefined' && Api.replyRoom) {
+                sent = Api.replyRoom(item.targetRoom, messages[k]);
+                if (sent) {
+                  Log.i('[메시지 전송 성공] Api.replyRoom (API1) - 방: ' + item.targetRoom + ', 청크: ' + (k + 1) + '/' + messages.length);
+                } else {
+                  Log.e('[메시지 전송 실패] Api.replyRoom이 false를 반환했습니다. 방: ' + item.targetRoom);
+                }
+              } else {
+                Log.e('[메시지 전송 실패] Bot.send와 Api.replyRoom 모두 사용 불가');
+                sent = false;
+              }
+            }
+            
+            if (!sent) {
               success = false;
-              sendError = 'Api.replyRoom returned false';
+              sendError = 'send failed (both API1 and API2)';
               break;
             }
-            Log.i('[메시지 전송 성공] 방: ' + item.targetRoom + ', 청크: ' + (k + 1) + '/' + messages.length);
             
             // 분할 메시지 사이 딜레이
             if (k < messages.length - 1) {
@@ -925,14 +985,19 @@ function processOutbox(config) {
 }
 
 // ========================================
-// 9. 메인 봇 함수
+// 9. 메인 봇 함수 (하이브리드: API1 이벤트 + API2 전송)
 // ========================================
 
-// 봇 시작 시 초기화
+// 초기화 함수 (API1 방식 유지)
 function onStartCompile() {
   try {
     Log.i('========================================');
     Log.i('[초기화] onStartCompile 함수 호출됨');
+    if (Bot) {
+      Log.i('[초기화] API2 모드 (Bot 객체 사용 가능)');
+    } else {
+      Log.i('[초기화] API1 모드 (BotManager 없음)');
+    }
     Log.i('========================================');
     logInfo('=== 카카오봇 초기화 시작 ===');
     
@@ -980,6 +1045,18 @@ function onStartCompile() {
   }
 }
 
+// API2 이벤트도 등록 (Bot이 있을 경우)
+if (Bot) {
+  try {
+    Bot.on('startCompile', function() {
+      onStartCompile();
+    });
+    Log.i('[이벤트 등록] API2 startCompile 이벤트 등록 완료');
+  } catch (e) {
+    Log.e('[이벤트 등록] API2 startCompile 이벤트 등록 실패: ' + e);
+  }
+}
+
 // 문자열의 각 문자 코드를 출력하는 헬퍼 함수
 function getCharCodes(str) {
   var codes = [];
@@ -989,8 +1066,30 @@ function getCharCodes(str) {
   return codes.join(',');
 }
 
-// 메시지 수신 시
+// 메시지 수신 시 (API1 방식 유지, API2 호환)
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
+  // API2 Message 객체로 변환 (Bot이 있을 경우)
+  var Message = null;
+  if (Bot && typeof replier !== 'undefined' && replier) {
+    // API2 호환: replier를 Message처럼 사용
+    Message = {
+      reply: function(text) { replier.reply(text); },
+      room: room,
+      content: msg,
+      author: { getName: function() { return sender; } },
+      isGroupChat: isGroupChat
+    };
+  } else {
+    // API1 방식: replier 직접 사용
+    Message = {
+      reply: function(text) { replier.reply(text); },
+      room: room,
+      content: msg,
+      author: { getName: function() { return sender; } },
+      isGroupChat: isGroupChat
+    };
+  }
+  
   // 상세 로그: sender 값과 문자 코드까지 출력
   Log.i('[DEBUG] ========== 메시지 수신 ==========');
   Log.i('[DEBUG] 방: [' + room + ']');
@@ -1019,7 +1118,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
           debugInfo += '  → sender와 일치: ' + (admin === sender ? 'YES' : 'NO') + '\n';
         }
       }
-      replier.reply(debugInfo);
+      Message.reply(debugInfo);
       return;
     }
     
@@ -1049,7 +1148,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
           }
         }
       }
-      replier.reply(info);
+      Message.reply(info);
       return;
     }
     
@@ -1062,7 +1161,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
       // botConfig 없어도 관리자 명령어 일부는 처리 가능
       if (!botConfig) {
         Log.e('[DEBUG] botConfig가 없음!');
-        replier.reply('봇 설정이 로드되지 않았습니다.\nbotConfig: NO\n\n서버 연결을 확인하세요.');
+        Message.reply('봇 설정이 로드되지 않았습니다.\nbotConfig: NO\n\n서버 연결을 확인하세요.');
         return;
       }
       
@@ -1083,10 +1182,10 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
       
       if (isAdmin) {
         Log.i('[DEBUG] 관리자 명령어 처리 시작');
-        handleAdminCommand(room, msg, sender, replier, botConfig);
+        handleAdminCommand(room, msg, sender, Message, botConfig);
       } else {
         Log.i('[DEBUG] 관리자 아님 - 명령어 거부');
-        replier.reply('관리자 전용 명령어입니다.\n\n현재 발신자: [' + sender + '] (길이:' + sender.length + ')\n등록된 관리자: ' + botConfig.admins.join(', '));
+        Message.reply('관리자 전용 명령어입니다.\n\n현재 발신자: [' + sender + '] (길이:' + sender.length + ')\n등록된 관리자: ' + botConfig.admins.join(', '));
       }
       return;
     }
@@ -1105,7 +1204,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     // botConfig 확인
     if (!botConfig) {
       Log.e('[DEBUG] botConfig가 없음!');
-      replier.reply('봇 설정이 로드되지 않았습니다.\n\n테스트 명령어: 테스트, 봇정보');
+      Message.reply('봇 설정이 로드되지 않았습니다.\n\n테스트 명령어: 테스트, 봇정보');
       return;
     }
     
@@ -1118,13 +1217,13 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     if (matchResult.updated && matchResult.oldName) {
       Log.i('[DEBUG] 방 이름 자동 업데이트됨: [' + matchResult.oldName + '] → [' + room + ']');
       // 사용자에게 알림 (선택적)
-      replier.reply('📢 방 이름이 변경되어 자동 업데이트되었습니다.\n\n기존: [' + matchResult.oldName + ']\n변경: [' + room + ']');
+      Message.reply('📢 방 이름이 변경되어 자동 업데이트되었습니다.\n\n기존: [' + matchResult.oldName + ']\n변경: [' + room + ']');
     }
     
     // roomConfig를 못 찾으면 디버그 응답 (문제 파악용)
     if (!roomConfig) {
       Log.e('[DEBUG] 방 미등록 - room: [' + room + '] (길이:' + room.length + ')');
-      replier.reply('이 방은 봇에 등록되지 않았습니다.\n\n현재 방 이름: [' + room + ']\n\n등록하려면 관리자가 다음 명령어를 실행하세요:\n!방추가 ' + room);
+      Message.reply('이 방은 봇에 등록되지 않았습니다.\n\n현재 방 이름: [' + room + ']\n\n등록하려면 관리자가 다음 명령어를 실행하세요:\n!방추가 ' + room);
       return;
     }
     
@@ -1144,11 +1243,30 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     
     // 일반 명령어 처리
     Log.i('[DEBUG] handleCommand 호출 - msg: ' + msg);
-    handleCommand(room, msg, sender, replier);
+    handleCommand(room, msg, sender, Message);
     
   } catch (e) {
     Log.e('[DEBUG] response 예외: ' + e);
-    replier.reply('오류 발생: ' + e);
+    Message.reply('오류 발생: ' + e);
+  }
+}
+
+// API2 이벤트도 등록 (Bot이 있을 경우)
+if (Bot) {
+  try {
+    Bot.on('message', function(Message) {
+      // API2 Message 객체에서 정보 추출
+      var room = Message.room;
+      var msg = Message.content;
+      var sender = Message.author.getName();
+      var isGroupChat = Message.isGroupChat;
+      
+      // API1 response 함수 호출 (호환성 유지)
+      response(room, msg, sender, isGroupChat, Message, null, Message.packageName);
+    });
+    Log.i('[이벤트 등록] API2 message 이벤트 등록 완료');
+  } catch (e) {
+    Log.e('[이벤트 등록] API2 message 이벤트 등록 실패: ' + e);
   }
 }
 
@@ -1166,17 +1284,26 @@ setInterval(function() {
 }, 60 * 60 * 1000);
 
 // ========================================
-// 10. 스크립트 로드 완료 후 초기화
+// 10. 스크립트 로드 완료 (하이브리드)
 // ========================================
-// 모든 변수와 함수가 정의된 후에 onStartCompile() 호출
-// (MessengerBotR이 자동 호출하지 않을 경우를 대비)
+// API1 방식: onStartCompile() 수동 호출 (BotManager가 없을 경우 대비)
+// API2 방식: Bot.on 이벤트 리스너가 자동으로 등록됨
 try {
   Log.i('========================================');
   Log.i('[스크립트 로드 완료] 모든 변수/함수 정의 완료');
-  Log.i('[스크립트 로드 완료] onStartCompile() 수동 호출 시작');
+  if (Bot) {
+    Log.i('[스크립트 로드 완료] API2 모드: Bot.on 이벤트 리스너 등록 완료');
+  } else {
+    Log.i('[스크립트 로드 완료] API1 모드: onStartCompile() 수동 호출 시작');
+    onStartCompile();
+  }
   Log.i('========================================');
-  onStartCompile();
-  Log.i('[스크립트 로드 완료] onStartCompile() 수동 호출 성공');
 } catch(initError) {
-  Log.e('[스크립트 로드 완료] onStartCompile() 호출 실패: ' + initError);
+  Log.e('[스크립트 로드 완료] 초기화 실패: ' + initError);
+  // 실패해도 onStartCompile 시도
+  try {
+    onStartCompile();
+  } catch(e) {
+    Log.e('[스크립트 로드 완료] onStartCompile() 호출도 실패: ' + e);
+  }
 }
