@@ -10,3 +10,8 @@
 
 # 로그
 *.log
+
+# 백업 파일
+*.copy
+*.bak
+*.backup
