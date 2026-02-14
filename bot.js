@@ -71,17 +71,8 @@ var botConfig = null;
 var serverConfig = null;
 var pollingTimer = null;
 
-// 명령어 목록 (/ prefix로 일반 대화와 구분)
-var COMMANDS = {
-  '/리스크': 'risk',
-  '/제휴': 'partnership',
-  '/기술': 'tech',
-  '/일정': 'schedule',
-  '/뉴스': 'news',
-  '/도움말': 'help',
-  '/헬프': 'help',
-  '/help': 'help'
-};
+// 명령어: / 로 시작하는 모든 메시지를 백엔드로 전달 (백엔드에서 동적 처리)
+// → 새 명령어 추가 시 bot.js 수정 불필요, 백엔드만 수정하면 됨
 
 // ========================================
 // 3. Logger 유틸리티
@@ -415,17 +406,10 @@ function findRoomConfigSmart(currentRoom, config, autoUpdate) {
 function handleCommand(room, msg, sender, Message) {
   try {
     var command = msg.trim();
-    
-    // 명령어 확인
-    if (!COMMANDS[command]) {
-      // 알 수 없는 /명령어는 도움말 안내
-      Message.reply('알 수 없는 명령어입니다: ' + command + '\n\n사용 가능한 명령어: ' + Object.keys(COMMANDS).join(', '));
-      return;
-    }
-    
     Log.i('[봇] 명령어 실행: ' + command);
     
-    // 백엔드 API 호출
+    // / 로 시작하는 모든 메시지를 백엔드로 전달 (명령어 whitelist 검사 제거)
+    // 백엔드에서 처리 가능 여부 판단 및 응답 반환
     var response = callBackendAPI(room, msg, sender);
     
     if (response && response.message) {
@@ -445,9 +429,13 @@ function handleCommand(room, msg, sender, Message) {
 function callBackendAPI(room, msg, sender) {
   try {
     var baseUrl = (serverConfig && serverConfig.serverUrl) || CONFIG.INITIAL_SERVER_URL;
+    var token = (serverConfig && serverConfig.botToken) || CONFIG.INITIAL_BOT_TOKEN;
     
     if (!baseUrl) {
       return { error: '서버 URL이 설정되지 않았습니다.' };
+    }
+    if (!token) {
+      return { error: '봇 토큰이 설정되지 않았습니다.' };
     }
     
     var url = baseUrl + '/kakao/message';
@@ -460,6 +448,7 @@ function callBackendAPI(room, msg, sender) {
     Log.i('[봇] API 호출: ' + url);
     
     var response = org.jsoup.Jsoup.connect(url)
+      .header('X-BOT-TOKEN', token)
       .header('Content-Type', 'application/json')
       .requestBody(requestBody)
       .ignoreContentType(true)
