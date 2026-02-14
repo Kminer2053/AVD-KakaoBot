@@ -60,8 +60,8 @@ var CONFIG = {
   // 카톡 메시지 길이 제한
   MAX_MESSAGE_LENGTH: 3000,
   
-  // HTTP 요청 타임아웃
-  REQUEST_TIMEOUT_MS: 10000 // 10초
+  // HTTP 요청 타임아웃 (LLM 등 느린 응답 대응)
+  REQUEST_TIMEOUT_MS: 30000 // 30초
 };
 
 // ========================================
